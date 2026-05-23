@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Zap, X, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
 import { Scenario } from "@/hooks/useWebSockets";
+import { BACKEND_URL } from "@/lib/config";
 
 interface ScenarioInputProps {
   activeScenarios: Scenario[];
@@ -53,7 +54,7 @@ export function ScenarioInput({ activeScenarios, onScenarioInjected, onScenarioR
     setSubmitting(true);
     setError("");
     try {
-      const res = await fetch("http://localhost:8080/api/scenario", {
+      const res = await fetch(`${BACKEND_URL}/api/scenario`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -88,7 +89,7 @@ export function ScenarioInput({ activeScenarios, onScenarioInjected, onScenarioR
 
   async function removeScenario(id: string) {
     try {
-      await fetch(`http://localhost:8080/api/scenario/${id}`, { method: "DELETE" });
+      await fetch(`${BACKEND_URL}/api/scenario/${id}`, { method: "DELETE" });
       if (onScenarioRemoved) onScenarioRemoved(id);
     } catch {
       // silent

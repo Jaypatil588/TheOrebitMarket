@@ -8,34 +8,30 @@ import { AgentActivity } from "@/components/sections/AgentActivity";
 import { MarketIntel } from "@/components/sections/MarketIntel";
 import { AsteroidData } from "@/components/Map3D/AsteroidBelt";
 import { useOrebitWebSocket, Scenario } from "@/hooks/useWebSockets";
+import { BACKEND_URL, WS_URL } from "@/lib/config";
 
 const OrbitScene = dynamic(() => import("@/components/Map3D/OrbitScene"), {
   ssr: false,
 });
-
-const WS_URL = "ws://localhost:8080/feed";
 
 export default function Home() {
   const [selectedAsteroid, setSelectedAsteroid] = useState<AsteroidData | null>(null);
   const [hoveredRingIndex, setHoveredRingIndex] = useState<number | null>(null);
   const [activeScenarios, setActiveScenarios] = useState<Scenario[]>([]);
 
-  // WebSocket connection — all agent data flows through here
-  const { marketPrices, rankings, routes, agentStatuses } = useOrebitWebSocket(WS_URL);
+  const { marketPrices, rankings, routes, agentStatuses } = useOrebitWebSocket(`${WS_URL}/feed`);
 
-  // Fetch active scenarios from backend on mount
   useEffect(() => {
-    fetch("http://localhost:8080/api/scenarios")
+    fetch(`${BACKEND_URL}/api/scenarios`)
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data.scenarios)) {
           setActiveScenarios(data.scenarios.filter((s: Scenario) => s.active));
         }
       })
-      .catch(() => {}); // backend may not be running
+      .catch(() => {});
   }, []);
 
-  // Esc key unselects asteroid
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") setSelectedAsteroid(null);
@@ -44,17 +40,8 @@ export default function Home() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  const handleScenarioInjected = (sc: Scenario) => {
-    setActiveScenarios((prev) => [sc, ...prev]);
-  };
-
-  const handleScenarioRemoved = (id: string) => {
-    setActiveScenarios((prev) => prev.filter((s) => s.id !== id));
-  };
-
   return (
     <main className="relative bg-black select-none">
-      {/* Back button when asteroid selected */}
       {selectedAsteroid && (
         <button
           onClick={() => setSelectedAsteroid(null)}
@@ -73,7 +60,6 @@ export default function Home() {
         </button>
       )}
 
-      {/* Section 1: Hero — Full-bleed 3D Earth + Asteroids */}
       <section className="snap-section relative h-screen">
         <OrbitScene
           selectedAsteroid={selectedAsteroid}
@@ -84,18 +70,13 @@ export default function Home() {
         <HeroOverlay />
       </section>
 
-      {/* Section 2: Strategic Rankings */}
       <StrategicRankings rankings={rankings} routes={routes} />
-
-      {/* Section 3: Agent Activity */}
       <AgentActivity agentStatuses={agentStatuses} />
-
-      {/* Section 4: Market Intelligence + Scenario Injection */}
       <MarketIntel
         prices={marketPrices}
         activeScenarios={activeScenarios}
-        onScenarioInjected={handleScenarioInjected}
-        onScenarioRemoved={handleScenarioRemoved}
+        onScenarioInjected={(sc) => setActiveScenarios((p) => [sc, ...p])}
+        onScenarioRemoved={(id) => setActiveScenarios((p) => p.filter((s) => s.id !== id))}
       />
     </main>
   );
