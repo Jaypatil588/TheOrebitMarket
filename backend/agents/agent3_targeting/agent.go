@@ -223,12 +223,11 @@ func (a *Agent) deterministicFallback(
 ) db.StrategicRanking {
 	log.Println("[AGENT3] Using deterministic fallback ranking")
 
-	// score
-	type scored struct {
+	// score using anonymous struct to match buildFallbackRoutes signature
+	var scoredList []struct {
 		score float64
 		v     db.AsteroidValuation
 	}
-	var scoredList []scored
 	for _, v := range valuations {
 		netVal := safeFloat(v.Valuation, "net_value_usd")
 		topMineral := safeStr(v.Valuation, "top_mineral")
@@ -242,7 +241,10 @@ func (a *Agent) deterministicFallback(
 			(urgency * 0.25) +
 			(math.Max(0, 1.0-dv/12.0) * 0.15) +
 			(conf * 0.10)
-		scoredList = append(scoredList, scored{s, v})
+		scoredList = append(scoredList, struct {
+			score float64
+			v     db.AsteroidValuation
+		}{s, v})
 	}
 	sort.Slice(scoredList, func(i, j int) bool {
 		return scoredList[i].score > scoredList[j].score
