@@ -40,17 +40,17 @@ function AgentCard({ icon, name, role, status, entries, accentColor, delay, isIn
             {icon}
           </div>
           <div>
-            <div className="text-[13px] font-semibold text-white" style={{ fontFamily: "var(--font-display)" }}>
+            <div className="text-base font-semibold text-white" style={{ fontFamily: "var(--font-display)" }}>
               {name}
             </div>
-            <div className="text-[10px] uppercase tracking-wider" style={{ color: "var(--dust-dim)" }}>
+            <div className="text-xs uppercase tracking-wider" style={{ color: "var(--dust-dim)" }}>
               {role}
             </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <span
-            className="text-[10px] uppercase tracking-wider font-medium"
+            className="text-xs uppercase tracking-wider font-medium"
             style={{
               color: status === "active" ? "var(--signal)"
                 : status === "complete" ? "var(--positive)"
@@ -78,10 +78,10 @@ function AgentCard({ icon, name, role, status, entries, accentColor, delay, isIn
               style={{ background: entry.status === "active" ? accentColor : "var(--orbit)" }}
             />
             <div>
-              <p className="text-[11px] leading-relaxed" style={{ color: "var(--dust)" }}>
+              <p className="text-sm leading-relaxed" style={{ color: "var(--dust)" }}>
                 {entry.message}
               </p>
-              <span className="text-[9px] font-mono" style={{ color: "var(--dust-dim)" }}>
+              <span className="text-xs font-mono" style={{ color: "var(--dust-dim)" }}>
                 {entry.timestamp}
               </span>
             </div>
@@ -101,59 +101,10 @@ function formatRelative(timestamp: string): string {
 }
 
 const AGENT_DEFS = [
-  {
-    key: "market_feed",
-    icon: <Search size={16} />,
-    name: "Market Intelligence",
-    role: "Supply Chain Analyst",
-    accentColor: "#3b82f6",
-    fallbackEntries: [
-      { id: "m1", message: "Searching: \"cobalt supply disruption 2026\"", timestamp: "2s ago", status: "active" as const },
-      { id: "m2", message: "Reading: reuters.com — DRC mine flooding report", timestamp: "8s ago", status: "done" as const },
-      { id: "m3", message: "Found: 3 cobalt mines offline, 12% global supply affected", timestamp: "14s ago", status: "done" as const },
-      { id: "m4", message: "Updated cobalt urgency: 0.82 → 0.92", timestamp: "18s ago", status: "done" as const },
-      { id: "m5", message: "Scanning platinum group metals supply chain...", timestamp: "22s ago", status: "done" as const },
-    ],
-  },
-  {
-    key: "targeting",
-    icon: <BarChart3 size={16} />,
-    name: "Strategic Ranker",
-    role: "Investment Strategist",
-    accentColor: "#22d3ee",
-    fallbackEntries: [
-      { id: "r1", message: "5 optimal routes computed successfully", timestamp: "12s ago", status: "done" as const },
-      { id: "r2", message: "Evaluating 500 asteroids against market conditions", timestamp: "24s ago", status: "done" as const },
-      { id: "r3", message: "Computing pairwise delta-v matrix for top 50", timestamp: "31s ago", status: "done" as const },
-      { id: "r4", message: "Best cobalt route: 3 stops, net value $5.2B", timestamp: "38s ago", status: "done" as const },
-    ],
-  },
-  {
-    key: "valuation",
-    icon: <Telescope size={16} />,
-    name: "Valuation Scout",
-    role: "NEA Research Analyst",
-    accentColor: "#a78bfa",
-    fallbackEntries: [
-      { id: "v1", message: "Deep research on 50-asteroid batch complete", timestamp: "34s ago", status: "done" as const },
-      { id: "v2", message: "Amun (M-type): cobalt 8.5%, platinum 0.05% confirmed", timestamp: "40s ago", status: "done" as const },
-      { id: "v3", message: "Net value computed using live prices from Agent 2", timestamp: "48s ago", status: "done" as const },
-      { id: "v4", message: "Upserted 50 valuations to DB", timestamp: "52s ago", status: "done" as const },
-    ],
-  },
-  {
-    key: "mission_report",
-    icon: <Rocket size={16} />,
-    name: "Mission Architect",
-    role: "Mission Design Engineer",
-    accentColor: "#f97316",
-    fallbackEntries: [
-      { id: "a1", message: "Awaiting asteroid selection from user...", timestamp: "now", status: "active" as const },
-      { id: "a2", message: "Last analysis: Amun — Falcon Heavy, robotic extraction", timestamp: "4m ago", status: "done" as const },
-      { id: "a3", message: "18-month surface ops, fuel efficiency 94.2%", timestamp: "4m ago", status: "done" as const },
-      { id: "a4", message: "Click an asteroid in 3D view to generate mission plan", timestamp: "—", status: "done" as const },
-    ],
-  },
+  { key: "market_feed",    icon: <Search size={16} />,    name: "Market Intelligence", role: "Supply Chain Analyst",    accentColor: "#3b82f6" },
+  { key: "targeting",     icon: <BarChart3 size={16} />, name: "Strategic Ranker",     role: "Investment Strategist",  accentColor: "#22d3ee" },
+  { key: "valuation",     icon: <Telescope size={16} />, name: "Valuation Scout",      role: "NEA Research Analyst",   accentColor: "#a78bfa" },
+  { key: "mission_report",icon: <Rocket size={16} />,    name: "Mission Architect",   role: "Mission Design Engineer", accentColor: "#f97316" },
 ];
 
 interface AgentActivityProps {
@@ -190,7 +141,9 @@ export function AgentActivity({ agentStatuses }: AgentActivityProps) {
     });
   }, [agentStatuses]);
 
-  const isLive = agentStatuses && Object.keys(agentStatuses).length > 0;
+  if (!agentStatuses || Object.keys(agentStatuses).length === 0) return null;
+
+  const isLive = true;
 
   let activeCount = 0;
   let idleCount = 0;
@@ -212,20 +165,20 @@ export function AgentActivity({ agentStatuses }: AgentActivityProps) {
         >
           <div className="flex items-center gap-3 mb-2">
             <h2
-              className="text-[32px] font-light tracking-[0.15em] text-white"
+              className="text-4xl font-light tracking-[0.15em] text-white"
               style={{ fontFamily: "var(--font-inter), var(--font-display)" }}
             >
               THE INTELLIGENCE
             </h2>
             {isLive && (
-              <span className="flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-wider px-2 py-1 rounded"
+              <span className="flex items-center gap-1.5 text-xs font-mono uppercase tracking-wider px-2 py-1 rounded"
                 style={{ background: "rgba(52,211,153,0.1)", color: "var(--positive)" }}>
                 <div className="w-1.5 h-1.5 rounded-full pulse-active" style={{ background: "var(--positive)" }} />
                 LIVE
               </span>
             )}
           </div>
-          <p className="text-[13px]" style={{ color: "var(--dust)" }}>
+          <p className="text-base" style={{ color: "var(--dust)" }}>
             Four Gemini managed agents working in parallel — scraping markets, valuing asteroids, optimizing routes
           </p>
         </motion.div>
@@ -247,7 +200,7 @@ export function AgentActivity({ agentStatuses }: AgentActivityProps) {
             else if (cardStatus === "complete") completeCount++;
             else idleCount++;
 
-            const entries = liveHistory && liveHistory.length > 0 ? liveHistory : def.fallbackEntries;
+            const entries = liveHistory ?? [];
 
             return (
               <AgentCard
@@ -265,44 +218,30 @@ export function AgentActivity({ agentStatuses }: AgentActivityProps) {
           })}
         </div>
 
-        {/* Status footer */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={isInView ? { opacity: 1 } : {}}
-          transition={{ duration: 0.5, delay: 0.8 }}
-          className="mt-6 flex items-center gap-4 text-[11px]"
-          style={{ color: "var(--dust-dim)" }}
-        >
-          {isLive ? (
-            <>
-              <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full pulse-active" style={{ background: "var(--signal)" }} />
-                <span>{activeCount} active</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--positive)" }} />
-                <span>{completeCount} complete</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--dust-dim)" }} />
-                <span>{idleCount} idle</span>
-              </div>
-              <span className="ml-auto tracking-wide">Live Gemini agent activity</span>
-            </>
-          ) : (
-            <>
-              <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full pulse-active" style={{ background: "var(--signal)" }} />
-                <span>1 active (mock)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--positive)" }} />
-                <span>2 complete (mock)</span>
-              </div>
-              <span className="ml-auto tracking-wide">Start backend for live data</span>
-            </>
-          )}
-        </motion.div>
+        {/* Status footer — only shown when live */}
+        {isLive && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={isInView ? { opacity: 1 } : {}}
+            transition={{ duration: 0.5, delay: 0.8 }}
+            className="mt-6 flex items-center gap-4 text-sm"
+            style={{ color: "var(--dust-dim)" }}
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full pulse-active" style={{ background: "var(--signal)" }} />
+              <span>{activeCount} active</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--positive)" }} />
+              <span>{completeCount} complete</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--dust-dim)" }} />
+              <span>{idleCount} idle</span>
+            </div>
+            <span className="ml-auto tracking-wide">Live Gemini agent activity</span>
+          </motion.div>
+        )}
       </div>
     </section>
   );

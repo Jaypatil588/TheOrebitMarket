@@ -13,16 +13,18 @@ import (
 	"github.com/Jaypatil588/TheOrebitMarket/backend/agents"
 	"github.com/Jaypatil588/TheOrebitMarket/backend/db"
 	"github.com/Jaypatil588/TheOrebitMarket/backend/engine"
+	"github.com/Jaypatil588/TheOrebitMarket/backend/gemini"
 )
 
 type API struct {
-	orch  *agents.Orchestrator
-	store *db.Store
-	eng   *engine.Engine
+	orch   *agents.Orchestrator
+	store  *db.Store
+	eng    *engine.Engine
+	gemini *gemini.Client
 }
 
-func NewAPI(o *agents.Orchestrator, d *db.Store, e *engine.Engine) *API {
-	return &API{orch: o, store: d, eng: e}
+func NewAPI(o *agents.Orchestrator, d *db.Store, e *engine.Engine, g *gemini.Client) *API {
+	return &API{orch: o, store: d, eng: e, gemini: g}
 }
 
 func EnableCors(w http.ResponseWriter) {
@@ -311,6 +313,102 @@ func (a *API) GetPricesHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"prices": prices,
 		"count":  len(prices),
+	})
+}
+
+// PostRouteImagesHandler generates AI visualizations for a mission route
+func (a *API) PostRouteImagesHandler(w http.ResponseWriter, r *http.Request) {
+	EnableCors(w)
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "Only POST allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		RouteID     string   `json:"route_id"`
+		AsteroidIDs []string `json:"asteroid_ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if a.gemini == nil || a.gemini.APIKey == "" {
+		log.Println("[API] Route images: Gemini client not configured")
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":      "unavailable",
+			"message":     "Image generation not configured",
+			"heatmap_url": nil,
+			"surface_url": nil,
+		})
+		return
+	}
+
+	ranking, err := a.store.GetLatestStrategicRanking()
+	if err != nil || ranking == nil {
+		http.Error(w, "No ranking data available", http.StatusServiceUnavailable)
+		return
+	}
+
+	var routeLabel string
+	var mineralFocus []string
+	for _, rt := range ranking.Routes {
+		if rt.ID == req.RouteID {
+			routeLabel = rt.Label
+			mineralFocus = rt.MineralFocus
+			break
+		}
+	}
+	if routeLabel == "" {
+		routeLabel = req.RouteID
+	}
+
+	var asteroidNames []string
+	for _, id := range req.AsteroidIDs {
+		for _, ast := range ranking.Rankings {
+			if ast.AsteroidID == id {
+				asteroidNames = append(asteroidNames, ast.Name)
+				break
+			}
+		}
+	}
+
+	log.Printf("[API] Generating route images: route=%s minerals=%v asteroids=%v", routeLabel, mineralFocus, asteroidNames)
+
+	heatmapB64, surfaceB64, err := a.gemini.GenerateRouteImages(routeLabel, mineralFocus, asteroidNames)
+	if err != nil {
+		log.Printf("[API] Image generation failed: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":      "error",
+			"message":     err.Error(),
+			"heatmap_url": nil,
+			"surface_url": nil,
+		})
+		return
+	}
+
+	var heatmapURL, surfaceURL *string
+	if heatmapB64 != "" {
+		url := "data:image/png;base64," + heatmapB64
+		heatmapURL = &url
+	}
+	if surfaceB64 != "" {
+		url := "data:image/png;base64," + surfaceB64
+		surfaceURL = &url
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":      "success",
+		"route_id":    req.RouteID,
+		"heatmap_url": heatmapURL,
+		"surface_url": surfaceURL,
 	})
 }
 

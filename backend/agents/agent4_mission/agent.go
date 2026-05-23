@@ -167,7 +167,12 @@ physical_profile_b64 = base64.b64encode(buf.read()).decode()
 }
 `
 
-// Agent is the on-demand mission report agent
+// Agent is the on-demand mission report agent.
+// IMPORTANT: This agent ONLY runs when explicitly triggered via RunAsync() for a
+// specific asteroid+route. It does NOT process all asteroids proactively.
+// Trigger points:
+//   - POST /api/mission-report with asteroid_id (via PostMissionReportHandler)
+//   - GET /api/asteroid?id=X&route_id=Y (when route_id is provided)
 type Agent struct {
 	gemini *gemini.Client
 	db     *db.Store
@@ -179,10 +184,12 @@ func New(g *gemini.Client, d *db.Store, h *websocket.Hub) *Agent {
 	return &Agent{gemini: g, db: d, hub: h}
 }
 
-// RunAsync fires Agent 4 in a goroutine, checks cache first
+// RunAsync fires Agent 4 in a goroutine for a SINGLE asteroid, checks cache first.
+// This is the ONLY entry point — Agent 4 never runs proactively on all asteroids.
 func (a *Agent) RunAsync(asteroidID, routeID string) {
 	go func() {
-		log.Printf("[AGENT4] ── RunAsync start | asteroid=%s route=%s ──", asteroidID, routeID)
+		log.Printf("[AGENT4] ── RunAsync start (ON-DEMAND for selected asteroid) ──")
+		log.Printf("[AGENT4] Target: asteroid=%s route=%s", asteroidID, routeID)
 		start := time.Now()
 
 		a.broadcastStatus(asteroidID, "researching", "Deep Research initializing mission brief...")

@@ -8,6 +8,7 @@ import { OrbitPaths } from "./OrbitPaths";
 import { AsteroidBelt, AsteroidData } from "./AsteroidBelt";
 import { RouteLines } from "./RouteLines";
 import { useCameraControls } from "@/hooks/useCameraControls";
+import { MissionRoute } from "@/hooks/useWebSockets";
 
 // ─── Toggle to true to render the shadow camera frustum wireframe in the browser ───
 const DEBUG_SHADOW_CAMERA = false;
@@ -41,6 +42,7 @@ interface OrbitSceneProps {
   onSelectAsteroid: (asteroid: AsteroidData | null) => void;
   hoveredRingIndex: number | null;
   onHoverRing: (ringIndex: number | null) => void;
+  routes?: MissionRoute[];
 }
 
 function SceneContent({
@@ -48,6 +50,7 @@ function SceneContent({
   onSelectAsteroid,
   hoveredRingIndex,
   onHoverRing,
+  routes,
 }: OrbitSceneProps) {
   useCameraControls(selectedAsteroid);
 
@@ -169,7 +172,7 @@ function SceneContent({
         onHoverRing={onHoverRing}
       />
 
-      <RouteLines selectedAsteroid={selectedAsteroid} />
+      <RouteLines selectedAsteroid={selectedAsteroid} routes={routes} />
     </>
   );
 }
@@ -179,9 +182,10 @@ export default function OrbitScene({
   onSelectAsteroid,
   hoveredRingIndex,
   onHoverRing,
+  routes,
 }: OrbitSceneProps) {
   return (
-    <div className="w-full h-screen sticky top-0 z-0 bg-black">
+    <div className="w-full h-full bg-black">
       <Canvas
         // PCFSoftShadowMap: uses percentage-closer filtering with a large kernel
         // for smooth, penumbra-style shadow edges (better than hard PCF or basic).
@@ -208,6 +212,7 @@ export default function OrbitScene({
             onSelectAsteroid={onSelectAsteroid}
             hoveredRingIndex={hoveredRingIndex}
             onHoverRing={onHoverRing}
+            routes={routes}
           />
         </Suspense>
       </Canvas>

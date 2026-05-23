@@ -6,8 +6,10 @@ import { HeroOverlay } from "@/components/sections/HeroOverlay";
 import { StrategicRankings } from "@/components/sections/StrategicRankings";
 import { AgentActivity } from "@/components/sections/AgentActivity";
 import { MarketIntel } from "@/components/sections/MarketIntel";
+import { AsteroidDetail } from "@/components/HUD/AsteroidDetail";
+import { RouteDetailPopup } from "@/components/HUD/RouteDetailPopup";
 import { AsteroidData } from "@/components/Map3D/AsteroidBelt";
-import { useOrebitWebSocket, Scenario } from "@/hooks/useWebSockets";
+import { useOrebitWebSocket, Scenario, MissionRoute } from "@/hooks/useWebSockets";
 import { BACKEND_URL, WS_URL } from "@/lib/config";
 
 const OrbitScene = dynamic(() => import("@/components/Map3D/OrbitScene"), {
@@ -16,6 +18,7 @@ const OrbitScene = dynamic(() => import("@/components/Map3D/OrbitScene"), {
 
 export default function Home() {
   const [selectedAsteroid, setSelectedAsteroid] = useState<AsteroidData | null>(null);
+  const [selectedRoute, setSelectedRoute] = useState<MissionRoute | null>(null);
   const [hoveredRingIndex, setHoveredRingIndex] = useState<number | null>(null);
   const [activeScenarios, setActiveScenarios] = useState<Scenario[]>([]);
 
@@ -34,11 +37,14 @@ export default function Home() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setSelectedAsteroid(null);
+      if (e.key === "Escape") {
+        if (selectedRoute) setSelectedRoute(null);
+        else setSelectedAsteroid(null);
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [selectedRoute]);
 
   return (
     <main className="relative bg-black select-none">
@@ -60,17 +66,28 @@ export default function Home() {
         </button>
       )}
 
-      <section className="snap-section relative h-screen">
+      {/* Fixed 3D scene as background layer */}
+      <div className="fixed inset-0 z-0">
         <OrbitScene
           selectedAsteroid={selectedAsteroid}
           onSelectAsteroid={setSelectedAsteroid}
           hoveredRingIndex={hoveredRingIndex}
           onHoverRing={setHoveredRingIndex}
+          routes={routes}
         />
+      </div>
+
+      {/* Hero section with transparent overlay */}
+      <section className="snap-section relative h-screen z-10">
         <HeroOverlay />
+        <AsteroidDetail
+          selectedAsteroid={selectedAsteroid}
+          onClose={() => setSelectedAsteroid(null)}
+        />
       </section>
 
-      <StrategicRankings rankings={rankings} routes={routes} />
+      {/* Content sections scroll over the 3D scene */}
+      <StrategicRankings rankings={rankings} routes={routes} onRouteClick={setSelectedRoute} />
       <AgentActivity agentStatuses={agentStatuses} />
       <MarketIntel
         prices={marketPrices}
@@ -78,6 +95,9 @@ export default function Home() {
         onScenarioInjected={(sc) => setActiveScenarios((p) => [sc, ...p])}
         onScenarioRemoved={(id) => setActiveScenarios((p) => p.filter((s) => s.id !== id))}
       />
+
+      {/* Route Detail Popup */}
+      <RouteDetailPopup route={selectedRoute} onClose={() => setSelectedRoute(null)} />
     </main>
   );
 }

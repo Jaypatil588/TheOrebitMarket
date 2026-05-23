@@ -20,9 +20,13 @@ func main() {
 	log.Println(" THE OREBIT MARKET — Backend starting...")
 	log.Println("==================================================")
 
-	// Load .env (silently ignore if absent — CI/prod uses env vars directly)
+	// Load .env — try current dir first, then parent (project root)
 	if err := godotenv.Load(); err != nil {
-		log.Println("[MAIN] No .env — using OS environment variables")
+		if err2 := godotenv.Load("../.env"); err2 != nil {
+			log.Println("[MAIN] No .env found — using OS environment variables")
+		} else {
+			log.Println("[MAIN] Loaded ../.env from project root")
+		}
 	}
 
 	apiKey := os.Getenv("GEMINI_API_KEY")
@@ -52,7 +56,7 @@ func main() {
 	log.Println("[MAIN] Orchestrator started — Agent 2 looping, Agent 1 pending first market cycle")
 
 	// HTTP layer
-	h := api.NewAPI(orch, store, eng)
+	h := api.NewAPI(orch, store, eng, geminiClient)
 	mux := http.NewServeMux()
 
 	// Core endpoints
@@ -78,6 +82,9 @@ func main() {
 	// Data query endpoints
 	mux.HandleFunc("/api/rankings", h.GetRankingsHandler)
 	mux.HandleFunc("/api/prices", h.GetPricesHandler)
+
+	// Route image generation
+	mux.HandleFunc("/api/route-images", h.PostRouteImagesHandler)
 
 	// Validation test suite (20 checks)
 	mux.HandleFunc("/api/test", h.GetTestHandler)

@@ -50,18 +50,18 @@ function TrendBadge({ change, trend }: { change: number; trend: string }) {
   const isUp = trend === "rising" || change > 0;
   const isDown = trend === "falling" || change < 0;
   if (isUp) return (
-    <span className="flex items-center gap-1 text-[12px] font-medium font-mono" style={{ color: "var(--positive)" }}>
-      <TrendingUp size={12} />+{Math.abs(change).toFixed(1)}%
+    <span className="flex items-center gap-1 text-sm font-medium font-mono" style={{ color: "var(--positive)" }}>
+      <TrendingUp size={13} />+{Math.abs(change).toFixed(1)}%
     </span>
   );
   if (isDown) return (
-    <span className="flex items-center gap-1 text-[12px] font-medium font-mono" style={{ color: "var(--danger)" }}>
-      <TrendingDown size={12} />-{Math.abs(change).toFixed(1)}%
+    <span className="flex items-center gap-1 text-sm font-medium font-mono" style={{ color: "var(--danger)" }}>
+      <TrendingDown size={13} />-{Math.abs(change).toFixed(1)}%
     </span>
   );
   return (
-    <span className="flex items-center gap-1 text-[12px] font-medium font-mono" style={{ color: "var(--dust-dim)" }}>
-      <Minus size={12} />0.0%
+    <span className="flex items-center gap-1 text-sm font-medium font-mono" style={{ color: "var(--dust-dim)" }}>
+      <Minus size={13} />0.0%
     </span>
   );
 }
@@ -82,16 +82,17 @@ export function MarketIntel({
   const sectionRef = useRef<HTMLDivElement>(null);
   const isInView = useInView(sectionRef, { once: true, margin: "-100px" });
 
-  const livePrices = prices && prices.length > 0 ? prices : MOCK_PRICES;
-  const isLive = prices && prices.length > 0;
+  if (!prices || prices.length === 0) return null;
+
+  const isLive = true;
 
   // Show top 6 by urgency for the grid cards
-  const displayPrices = [...livePrices]
+  const displayPrices = [...prices]
     .sort((a, b) => b.urgency - a.urgency)
     .slice(0, 6);
 
   // Show disruptions for the alerts panel
-  const alerts = livePrices
+  const alerts = prices
     .filter((p) => p.disruption || p.scenario_adjusted)
     .sort((a, b) => b.urgency - a.urgency)
     .slice(0, 5);
@@ -112,20 +113,20 @@ export function MarketIntel({
         >
           <div className="flex items-center gap-3 mb-2">
             <h2
-              className="text-[32px] font-light tracking-[0.15em] text-white"
+              className="text-4xl font-light tracking-[0.15em] text-white"
               style={{ fontFamily: "var(--font-inter), var(--font-display)" }}
             >
               THE MARKETS
             </h2>
             {isLive && (
-              <span className="flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-wider px-2 py-1 rounded"
+              <span className="flex items-center gap-1.5 text-xs font-mono uppercase tracking-wider px-2 py-1 rounded"
                 style={{ background: "rgba(52,211,153,0.1)", color: "var(--positive)" }}>
                 <div className="w-1.5 h-1.5 rounded-full pulse-active" style={{ background: "var(--positive)" }} />
                 LIVE
               </span>
             )}
           </div>
-          <p className="text-[13px]" style={{ color: "var(--dust)" }}>
+          <p className="text-base" style={{ color: "var(--dust)" }}>
             Live commodity intelligence driving asteroid valuations — sourced by Market Intelligence agent
           </p>
         </motion.div>
@@ -142,20 +143,20 @@ export function MarketIntel({
               style={p.scenario_adjusted ? { borderColor: "rgba(251,191,36,0.3)" } : {}}
             >
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-medium uppercase tracking-wider" style={{ color: "var(--dust-dim)" }}>
+                <span className="text-xs font-medium uppercase tracking-wider" style={{ color: "var(--dust-dim)" }}>
                   {p.mineral.replace(/_/g, " ")}
                 </span>
-                <span className="text-[11px] font-mono font-bold px-1.5 py-0.5 rounded"
+                <span className="text-sm font-mono font-bold px-1.5 py-0.5 rounded"
                   style={{ background: p.scenario_adjusted ? "rgba(251,191,36,0.15)" : "var(--orbit)", color: p.scenario_adjusted ? "var(--warning)" : "var(--dust)" }}>
                   {symbolFor(p.mineral)}
                 </span>
               </div>
 
               <div>
-                <span className="text-[20px] font-mono font-semibold text-white">
+                <span className="text-2xl font-mono font-semibold text-white">
                   ${formatPrice(p.price_usd)}
                 </span>
-                <span className="text-[9px] ml-1" style={{ color: "var(--dust-dim)" }}>
+                <span className="text-xs ml-1" style={{ color: "var(--dust-dim)" }}>
                   {unitFor(p.price_usd)}
                 </span>
               </div>
@@ -164,10 +165,10 @@ export function MarketIntel({
 
               <div>
                 <div className="flex justify-between mb-1">
-                  <span className="text-[9px] uppercase tracking-wider" style={{ color: "var(--dust-dim)" }}>
+                  <span className="text-xs uppercase tracking-wider" style={{ color: "var(--dust-dim)" }}>
                     Urgency
                   </span>
-                  <span className="text-[9px] font-mono" style={{ color: "var(--dust)" }}>
+                  <span className="text-xs font-mono" style={{ color: "var(--dust)" }}>
                     {(p.urgency * 100).toFixed(0)}%
                   </span>
                 </div>
@@ -194,7 +195,7 @@ export function MarketIntel({
             animate={isInView ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.6, delay: 0.7 }}
           >
-            <h3 className="text-[11px] font-medium uppercase tracking-[0.15em] mb-4" style={{ color: "var(--dust-dim)" }}>
+            <h3 className="text-sm font-medium uppercase tracking-[0.15em] mb-4" style={{ color: "var(--dust-dim)" }}>
               Supply Chain Alerts
             </h3>
             <div className="glass-card divide-y" style={{ borderColor: "var(--orbit)" }}>
@@ -210,12 +211,12 @@ export function MarketIntel({
                   <SeverityIcon urgency={alert.urgency} scenario={alert.scenario_adjusted} />
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <span className="text-[12px] font-semibold text-white capitalize"
+                      <span className="text-base font-semibold text-white capitalize"
                         style={{ fontFamily: "var(--font-display)" }}>
                         {alert.mineral.replace(/_/g, " ")}
                       </span>
                       <span
-                        className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded font-medium"
+                        className="text-xs uppercase tracking-wider px-1.5 py-0.5 rounded font-medium"
                         style={{
                           background: alert.scenario_adjusted ? "rgba(251,191,36,0.1)"
                             : alert.urgency > 0.7 ? "rgba(239,68,68,0.1)"
@@ -228,11 +229,11 @@ export function MarketIntel({
                         {alert.scenario_adjusted ? "scenario" : alert.urgency > 0.7 ? "high" : "medium"}
                       </span>
                     </div>
-                    <p className="text-[11px] leading-relaxed" style={{ color: "var(--dust)" }}>
+                    <p className="text-sm leading-relaxed" style={{ color: "var(--dust)" }}>
                       {alert.disruption || "Market conditions elevated — monitor closely."}
                     </p>
                   </div>
-                  <span className="text-[9px] font-mono shrink-0 mt-1" style={{ color: "var(--dust-dim)" }}>
+                  <span className="text-xs font-mono shrink-0 mt-1" style={{ color: "var(--dust-dim)" }}>
                     urgency {(alert.urgency * 100).toFixed(0)}%
                   </span>
                 </motion.div>
@@ -259,12 +260,12 @@ export function MarketIntel({
           initial={{ opacity: 0 }}
           animate={isInView ? { opacity: 1 } : {}}
           transition={{ duration: 0.5, delay: 1.3 }}
-          className="mt-6 text-[11px] tracking-wide"
+          className="mt-6 text-sm tracking-wide"
           style={{ color: "var(--dust-dim)" }}
         >
           {isLive
-            ? `Live data — ${livePrices.length} minerals tracked · Refreshes every 10s via Agent 2`
-            : "Mock data — start Go backend to receive live prices"}
+            ? `Live data — ${prices.length} minerals tracked · Refreshes every 10s via Agent 2`
+            : null}
         </motion.p>
       </div>
     </section>

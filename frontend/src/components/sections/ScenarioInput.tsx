@@ -101,10 +101,10 @@ export function ScenarioInput({ activeScenarios, onScenarioInjected, onScenarioR
       {/* Header */}
       <div className="flex items-center gap-2 mb-4">
         <Zap size={13} style={{ color: "var(--warning)" }} />
-        <h3 className="text-[11px] font-medium uppercase tracking-[0.15em]" style={{ color: "var(--dust-dim)" }}>
+        <h3 className="text-sm font-medium uppercase tracking-[0.15em]" style={{ color: "var(--dust-dim)" }}>
           Scenario Injection
         </h3>
-        <span className="text-[9px] px-1.5 py-0.5 rounded font-mono" style={{ background: "rgba(251,191,36,0.1)", color: "var(--warning)" }}>
+        <span className="text-xs px-1.5 py-0.5 rounded font-mono" style={{ background: "rgba(251,191,36,0.1)", color: "var(--warning)" }}>
           LIVE CASCADE
         </span>
       </div>
@@ -116,7 +116,7 @@ export function ScenarioInput({ activeScenarios, onScenarioInjected, onScenarioR
             key={p.label}
             onClick={() => injectScenario(p.description, p.affected_minerals, p.severity)}
             disabled={submitting}
-            className="text-[10px] font-mono px-3 py-1.5 rounded border transition-all duration-200 hover:opacity-90 disabled:opacity-40 cursor-pointer"
+            className="text-xs font-mono px-3 py-1.5 rounded border transition-all duration-200 hover:opacity-90 disabled:opacity-40 cursor-pointer"
             style={{
               borderColor: `${p.color}40`,
               background: `${p.color}10`,
@@ -128,7 +128,7 @@ export function ScenarioInput({ activeScenarios, onScenarioInjected, onScenarioR
         ))}
         <button
           onClick={() => setShowCustom(!showCustom)}
-          className="text-[10px] font-mono px-3 py-1.5 rounded border transition-all duration-200 cursor-pointer"
+          className="text-xs font-mono px-3 py-1.5 rounded border transition-all duration-200 cursor-pointer"
           style={{ borderColor: "var(--orbit)", color: "var(--dust-dim)" }}
         >
           Custom {showCustom ? <ChevronUp size={10} className="inline" /> : <ChevronDown size={10} className="inline" />}
@@ -155,11 +155,11 @@ export function ScenarioInput({ activeScenarios, onScenarioInjected, onScenarioR
                   }
                 }}
                 placeholder='e.g. "Indonesia nickel export ban for 6 months"'
-                className="w-full bg-transparent text-[12px] font-mono text-white placeholder-slate-600 outline-none border-b pb-1"
+                className="w-full bg-transparent text-sm font-mono text-white placeholder-slate-600 outline-none border-b pb-1"
                 style={{ borderColor: "var(--orbit)" }}
               />
               <div className="flex items-center gap-3">
-                <span className="text-[10px]" style={{ color: "var(--dust-dim)" }}>
+                <span className="text-xs" style={{ color: "var(--dust-dim)" }}>
                   Severity
                 </span>
                 <input

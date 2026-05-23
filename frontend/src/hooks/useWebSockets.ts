@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { formatTelemetryTime } from "@/lib/utils";
+import { BACKEND_URL } from "@/lib/config";
 
 // ── Log entries (telemetry feed) ──────────────────────────────────────────────
 export interface LogEntry {
@@ -130,25 +131,30 @@ export function useOrebitWebSocket(url?: string) {
   const [connected, setConnected] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
 
-  // Seed initial mock telemetry on mount
+  // Initial telemetry logs start empty
+
+  // Fetch initial state from database on mount so we don't wait for WebSocket broadcasts
   useEffect(() => {
-    const now = new Date();
-    const seed: LogEntry[] = [];
-    for (let i = 6; i >= 0; i--) {
-      const t = new Date(now.getTime() - i * 7000);
-      seed.push({
-        id: `init-${i}`,
-        timestamp: formatTelemetryTime(t),
-        type: i === 6 ? "info" : i === 5 ? "success" : "telemetry",
-        agentId: MOCK_AGENTS[i % MOCK_AGENTS.length],
-        message: i === 6
-          ? "THE OREBIT MARKET telemetry core initializing..."
-          : i === 5
-          ? "Agent swarm deployed. Market feed + valuation pipeline active."
-          : `Telemetry link established to ${MOCK_SECTORS[i % MOCK_SECTORS.length]}.`,
-      });
-    }
-    setLogs(seed);
+    // 1. Fetch prices
+    fetch(`${BACKEND_URL}/api/prices`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && Array.isArray(data.prices)) {
+          setMarketPrices(data.prices);
+        }
+      })
+      .catch((err) => console.warn("[WS REST] Failed to fetch initial prices:", err));
+
+    // 2. Fetch rankings and routes
+    fetch(`${BACKEND_URL}/api/rankings`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data) {
+          if (Array.isArray(data.rankings)) setRankings(data.rankings);
+          if (Array.isArray(data.routes)) setRoutes(data.routes);
+        }
+      })
+      .catch((err) => console.warn("[WS REST] Failed to fetch initial rankings:", err));
   }, []);
 
   // WebSocket connection + message routing
@@ -235,23 +241,7 @@ export function useOrebitWebSocket(url?: string) {
     return () => ws.close();
   }, [url]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Mock telemetry ticker (runs regardless — supplements real logs when connected)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (connected) return; // let real WS drive logs when live
-      const sector = MOCK_SECTORS[Math.floor(Math.random() * MOCK_SECTORS.length)];
-      const ring = Math.floor(Math.random() * 4) + 1;
-      const name = MOCK_NAMES[Math.floor(Math.random() * MOCK_NAMES.length)];
-      const msg = MOCK_MSGS[Math.floor(Math.random() * MOCK_MSGS.length)];
-      const text = msg.message
-        .replace("{sector}", sector)
-        .replace("{ring}", String(ring))
-        .replace("{name}", name)
-        .replace("{comp}", `${(80 + Math.random() * 15).toFixed(1)}% basalt, ${(0.1 + Math.random() * 1.5).toFixed(2)}% PGMs`);
-      addLog(msg.type as LogEntry["type"], MOCK_AGENTS[Math.floor(Math.random() * MOCK_AGENTS.length)], text);
-    }, 4500);
-    return () => clearInterval(interval);
-  }, [connected]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Mock telemetry ticker removed
 
   const addLog = useCallback((type: LogEntry["type"], agentId: string, message: string) => {
     setLogs((prev) => [

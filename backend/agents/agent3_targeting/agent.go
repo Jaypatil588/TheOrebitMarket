@@ -56,19 +56,16 @@ top20 = scored[:20]
 For each of the top 20, write a reasoning field (2-4 sentences) citing actual numbers.
 Mark scenario_boosted=true if scenario_impact > 0.
 
-## STEP 3 — COMPUTE 5 ROUTES
-Using the dv_matrix (top 50 asteroids + Earth), run TSP-style optimization in sandbox:
-Routes to compute:
-1. cobalt_priority (blue #3b82f6, budget 9km/s) — maximize cobalt+nickel value × urgency
-2. platinum_priority (silver #94a3b8, budget 9km/s) — maximize PGM value × urgency
-3. rare_earth_priority (gold #f59e0b, budget 9km/s) — maximize REE value × urgency
-4. water_fuel_priority (teal #14b8a6, budget 7km/s) — C-type asteroids, maximize water_ice fraction
-5. best_roi_mixed (white #f8fafc, budget 10km/s) — maximize total net_value regardless of mineral
+## STEP 3 — COMPUTE TOP 3 ROUTES
+Using the dv_matrix (top 50 asteroids + Earth), compute exactly 3 optimal routes:
+1. best_composite (white #f8fafc, budget 10km/s) — maximize composite score (value × urgency × accessibility)
+2. high_urgency (blue #3b82f6, budget 9km/s) — target minerals with highest current market urgency from urgency map
+3. accessible_value (green #22c55e, budget 7km/s) — low delta-v asteroids with best value/accessibility ratio
 
-Each route: Earth → 2-4 stops → Earth. Must start and end at Earth.
-For each route write route_reasoning (3-5 sentences with actual numbers).
+Each route: Earth → 2-3 stops → Earth. Must start and end at Earth.
+For each route write route_reasoning (2-3 sentences with actual numbers).
 Mark scenario_driven=true if scenario changed mineral priorities.
-Set is_default=true for the route with highest urgency_score.
+Set is_default=true for best_composite route.
 
 ## OUTPUT — JSON ONLY
 {
@@ -210,8 +207,8 @@ func (a *Agent) saveAndBroadcast(result db.StrategicRanking, start time.Time) {
 	elapsed := time.Since(start)
 	log.Printf("[AGENT3] ── Run complete in %s ──────────────────────────────────────",
 		elapsed.Round(time.Second))
-	a.broadcastStatus("idle", fmt.Sprintf("Ranked %d asteroids, computed 5 routes in %s.",
-		len(result.Rankings), elapsed.Round(time.Second)))
+	a.broadcastStatus("idle", fmt.Sprintf("Ranked %d asteroids, computed %d routes in %s.",
+		len(result.Rankings), len(result.Routes), elapsed.Round(time.Second)))
 }
 
 // deterministicFallback ranks purely by net_value when Gemini is down
@@ -313,24 +310,31 @@ func buildFallbackRoutes(
 	urgencyMap map[string]float64,
 	dvMatrix map[string]map[string]float64,
 ) []db.MissionRoute {
+	// Find the mineral with highest urgency for the high_urgency route
+	var topUrgentMineral string
+	maxUrg := 0.0
+	for mineral, urg := range urgencyMap {
+		if urg > maxUrg {
+			maxUrg = urg
+			topUrgentMineral = mineral
+		}
+	}
+
+	// Only 3 routes: best_composite, high_urgency, accessible_value
 	routeDefs := []struct {
 		id, label, color string
-		urgencyBoost     float64
 		mineral          string
+		maxDV            float64
 	}{
-		{"cobalt_priority", "Cobalt Route", "#3b82f6", 0.0, "cobalt"},
-		{"platinum_priority", "Platinum Route", "#94a3b8", 0.0, "platinum"},
-		{"rare_earth_priority", "Rare Earth Route", "#f59e0b", 0.0, "neodymium"},
-		{"water_fuel_priority", "Water/Fuel Route", "#14b8a6", 0.0, "water_ice"},
-		{"best_roi_mixed", "Best ROI Mixed", "#f8fafc", 0.0, ""},
+		{"best_composite", "Best Composite", "#f8fafc", "", 10.0},
+		{"high_urgency", "High Urgency", "#3b82f6", topUrgentMineral, 9.0},
+		{"accessible_value", "Accessible Value", "#22c55e", "", 6.0},
 	}
 
 	routes := []db.MissionRoute{}
-	maxUrgency := 0.0
-	defaultIdx := 0
 
 	for ri, rd := range routeDefs {
-		// pick top 3 asteroids for this route's mineral focus
+		// pick top 2-3 asteroids for this route
 		stops := []db.RouteStop{{Order: 0, Body: "Earth", DepartureYear: 2027}}
 		totalDV := 0.0
 		totalVal := 0.0
@@ -341,12 +345,17 @@ func buildFallbackRoutes(
 				break
 			}
 			topMineral := safeStr(sv.v.Valuation, "top_mineral")
+			// Filter by mineral if specified
 			if rd.mineral != "" && topMineral != rd.mineral {
 				continue
 			}
 			dv := safeFloat(sv.v.Orbital, "delta_v_km_s")
 			if dv == 0 {
 				dv = 6
+			}
+			// Filter by delta-v budget for accessible_value route
+			if dv > rd.maxDV {
+				continue
 			}
 			val := safeFloat(sv.v.Valuation, "net_value_usd")
 			stops = append(stops, db.RouteStop{
@@ -362,26 +371,33 @@ func buildFallbackRoutes(
 		totalDV += 3.5
 
 		urgency := urgencyMap[rd.mineral]
-		if urgency > maxUrgency {
-			maxUrgency = urgency
-			defaultIdx = ri
+		mineralFocus := []string{}
+		if rd.mineral != "" {
+			mineralFocus = []string{rd.mineral}
 		}
+
+		reasoning := fmt.Sprintf("Route optimized for %s. %d stops, Δv=%.1f km/s, value=$%.2e.",
+			rd.label, len(stops)-2, totalDV, totalVal)
 
 		routes = append(routes, db.MissionRoute{
 			ID: rd.id, Label: rd.label, ColorHex: rd.color,
-			UrgencyScore: urgency, UrgencyReason: fmt.Sprintf("Based on %s market urgency %.2f", rd.mineral, urgency),
-			MineralFocus: []string{rd.mineral}, Stops: stops,
+			UrgencyScore: urgency,
+			UrgencyReason: func() string {
+				if rd.mineral != "" {
+					return fmt.Sprintf("Based on %s market urgency %.2f", rd.mineral, urgency)
+				}
+				return "Composite scoring across all minerals"
+			}(),
+			MineralFocus: mineralFocus, Stops: stops,
 			Totals: db.RouteTotals{
 				TotalValueUSD: totalVal, NetReturnUSD: totalVal * 0.6,
 				TotalDeltaVKmS: totalDV, DurationYears: float64(len(stops)-2) * 1.5,
 			},
-			RouteReasoning: fmt.Sprintf("Fallback route for %s. %d stops, Δv=%.1f km/s.", rd.label, len(stops)-2, totalDV),
+			RouteReasoning: reasoning,
+			IsDefault:      ri == 0, // best_composite is default
 		})
 	}
 
-	if len(routes) > 0 {
-		routes[defaultIdx].IsDefault = true
-	}
 	return routes
 }
 
