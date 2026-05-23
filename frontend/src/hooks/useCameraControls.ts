@@ -11,13 +11,13 @@ interface AsteroidPosition {
 export function useCameraControls(selectedAsteroid: AsteroidPosition | null) {
   const { camera } = useThree();
   
-  // Adjusted original/idle camera positioning for precise top-left Earth and diagonal orbit alignment
-  const originalPosition = useRef(new THREE.Vector3(0, 1.2, 9.2));
-  const targetPosition = useRef(new THREE.Vector3(0, 1.2, 9.2));
+  // Camera defaults for centered Earth — pulled back to see full globe + orbits
+  const originalPosition = useRef(new THREE.Vector3(0, 6, 14));
+  const targetPosition = useRef(new THREE.Vector3(0, 6, 14));
   
-  // Set default lookAt to be centered near the orbits crossing plane
-  const lookAtTarget = useRef(new THREE.Vector3(-0.6, 0.5, 0));
-  const targetLookAt = useRef(new THREE.Vector3(-0.6, 0.5, 0));
+  // Look at the center of the scene (Earth)
+  const lookAtTarget = useRef(new THREE.Vector3(0, 0, 0));
+  const targetLookAt = useRef(new THREE.Vector3(0, 0, 0));
 
   // Handle selected asteroid changes
   useEffect(() => {
@@ -37,11 +37,11 @@ export function useCameraControls(selectedAsteroid: AsteroidPosition | null) {
     } else {
       // Return to global view
       targetPosition.current.copy(originalPosition.current);
-      targetLookAt.current.set(-0.6, 0.5, 0);
+      targetLookAt.current.set(0, 0, 0);
     }
   }, [selectedAsteroid]);
 
-  // Interpolate camera frame by frame for ultra-smooth sliding
+  // Interpolate camera frame by frame for ultra-smooth transitions
   useFrame((state, delta) => {
     const speed = 3.2;
     const t = Math.min(delta * speed, 1);
@@ -52,17 +52,14 @@ export function useCameraControls(selectedAsteroid: AsteroidPosition | null) {
     // Smooth lookAt target transition
     lookAtTarget.current.lerp(targetLookAt.current, t);
     
-    // Rotate camera to face target, preserving roll angle
+    // Rotate camera to face target
     camera.lookAt(lookAtTarget.current);
     
-    // Apply counter-clockwise roll to get visual alignment of diagonal orbits wrapping Earth
-    camera.rotation.z = Math.PI / 4.0;
-    
-    // Subtle float drift
+    // Subtle float drift when no asteroid selected
     if (!selectedAsteroid) {
       const time = state.clock.getElapsedTime();
-      camera.position.x += Math.sin(time * 0.2) * 0.0004;
-      camera.position.y += Math.cos(time * 0.15) * 0.0003;
+      camera.position.x += Math.sin(time * 0.15) * 0.0003;
+      camera.position.y += Math.cos(time * 0.12) * 0.0002;
     }
   });
 

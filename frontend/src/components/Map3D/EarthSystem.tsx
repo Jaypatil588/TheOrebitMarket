@@ -1,86 +1,73 @@
-import { useRef } from "react";
+import { useRef, useMemo } from "react";
 import { useFrame, useLoader } from "@react-three/fiber";
 import * as THREE from "three";
-import { AtmosphereShader } from "@/lib/shaders";
+import { AtmosphereShader, EarthShader } from "@/lib/shaders";
 
 export function EarthSystem() {
   const earthRef = useRef<THREE.Mesh>(null);
-  const cloudsRef = useRef<THREE.Mesh>(null);
+  const glowRef = useRef<THREE.Mesh>(null);
 
-  // Load high-resolution textures
-  const [colorMap, normalMap, specularMap, cloudsMap] = useLoader(THREE.TextureLoader, [
-    "/textures/earth_color_8k.jpg",
-    "/textures/earth_normal_8k.jpg",
-    "/textures/earth_specular_8k.jpg",
-    "/textures/earth_clouds_8k.jpg",
+  // Load Bobby Roe's exact textures from update-2024 branch
+  const [dayMap, nightMap, cloudsMap] = useLoader(THREE.TextureLoader, [
+    "/textures/earth-daymap-4k.jpg",
+    "/textures/earth-nightmap-4k.jpg",
+    "/textures/earth-clouds-4k.jpg",
   ]);
 
-  // Configure texture parameters for premium quality shading
-  if (colorMap) colorMap.colorSpace = THREE.SRGBColorSpace;
-  
-  // Rotate Earth surface and cloud layer independently
-  useFrame((state, delta) => {
-    const earthSpeed = 0.008; // Slower, more majestic rotation
-    const cloudsSpeed = 0.014;
-    
+  // Bobby's exact sun direction — NOT normalized (his code: new THREE.Vector3(-2, 0.5, 1.5))
+  const sunDirection = useMemo(() => new THREE.Vector3(-2, 0.5, 1.5), []);
+
+  // Earth shader uniforms — exact match to getEarthMat.js
+  const earthUniforms = useMemo(() => ({
+    dayTexture: { value: dayMap },
+    nightTexture: { value: nightMap },
+    cloudsTexture: { value: cloudsMap },
+    sunDirection: { value: sunDirection },
+  }), [dayMap, nightMap, cloudsMap, sunDirection]);
+
+  // Fresnel atmosphere uniforms — exact match to getFresnelMat.js
+  const atmosphereUniforms = useMemo(() => ({
+    color1: { value: new THREE.Color(0x0088ff) },
+    color2: { value: new THREE.Color(0x000000) },
+    fresnelBias: { value: 0.1 },
+    fresnelScale: { value: 1.0 },
+    fresnelPower: { value: 4.0 },
+  }), []);
+
+  // Rotate Earth — slow cinematic rotation
+  useFrame(() => {
     if (earthRef.current) {
-      earthRef.current.rotation.y += delta * earthSpeed;
+      earthRef.current.rotation.y += 0.0002;
     }
-    
-    if (cloudsRef.current) {
-      cloudsRef.current.rotation.y += delta * cloudsSpeed;
-      cloudsRef.current.rotation.x = Math.sin(state.clock.getElapsedTime() * 0.008) * 0.03;
+    if (glowRef.current) {
+      glowRef.current.rotation.y += 0.0002;
     }
   });
 
-  // Positioning the Earth center off-screen in the top-left quadrant to match the reference screenshot
-  const earthCenter: [number, number, number] = [-3.8, 3.8, -2.0];
+  // Earth centered at origin for hero section
+  const earthCenter: [number, number, number] = [0, 0, 0];
 
   return (
-    <group position={earthCenter}>
-      {/* LAYER A: Surface Core Globe (Radius scaled up to 5.0 for high impact visual curving) */}
+    <group position={earthCenter} rotation={[0, 0, -23.4 * Math.PI / 180]}>
+      {/* Earth globe — Bobby uses IcosahedronGeometry detail=32 */}
       <mesh ref={earthRef} castShadow receiveShadow>
-        <sphereGeometry args={[5.0, 128, 128]} />
-        <meshStandardMaterial
-          map={colorMap}
-          normalMap={normalMap}
-          normalScale={new THREE.Vector2(0.9, 0.9)}
-          roughnessMap={specularMap}
-          roughness={0.7}
-          metalness={0.08}
-          envMapIntensity={0.3}
+        <icosahedronGeometry args={[5.0, 32]} />
+        <shaderMaterial
+          vertexShader={EarthShader.vertexShader}
+          fragmentShader={EarthShader.fragmentShader}
+          uniforms={earthUniforms}
         />
       </mesh>
 
-      {/* LAYER B: Translucent Clouds Concentric Shell */}
-      <mesh ref={cloudsRef}>
-        <sphereGeometry args={[5.04, 128, 128]} />
-        <meshStandardMaterial
-          alphaMap={cloudsMap}
-          transparent={true}
-          color="#ffffff"
-          opacity={0.68}
-          blending={THREE.NormalBlending}
-          depthWrite={false}
-          roughness={0.85}
-        />
-      </mesh>
-
-      {/* LAYER C: Volumetric Atmospheric Limb (Fresnel Shader with adjusted bloom corona) */}
-      <mesh>
-        <sphereGeometry args={[5.1, 128, 128]} />
+      {/* Fresnel atmosphere glow — Bobby uses scale 1.02, transparent, additive blending */}
+      <mesh ref={glowRef} scale={[1.02, 1.02, 1.02]}>
+        <icosahedronGeometry args={[5.0, 32]} />
         <shaderMaterial
           vertexShader={AtmosphereShader.vertexShader}
           fragmentShader={AtmosphereShader.fragmentShader}
-          uniforms={{
-            color: { value: new THREE.Color(0.24, 0.62, 0.95) }, // Atmospheric cyan-blue
-            coefficient: { value: 0.68 },
-            power: { value: 3.8 } // High edge-sharpness
-          }}
-          blending={THREE.AdditiveBlending}
-          side={THREE.BackSide}
+          uniforms={atmosphereUniforms}
           transparent={true}
-          depthWrite={false}
+          blending={THREE.AdditiveBlending}
         />
       </mesh>
     </group>

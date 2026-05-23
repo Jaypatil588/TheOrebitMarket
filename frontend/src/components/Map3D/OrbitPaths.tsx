@@ -12,19 +12,18 @@ export function OrbitPaths({
   hoveredRingIndex,
   selectedRingIndex,
 }: OrbitPathsProps) {
-  // Center of orbits matching Earth's off-screen top-left position
-  const centerX = -3.8;
-  const centerY = 1.8; // Lowered along Y axis to wrap the southern hemisphere of Earth
-  const centerZ = -2.0;
+  // Center of orbits — aligned with centered Earth
+  const centerX = 0;
+  const centerY = 0;
+  const centerZ = 0;
 
-  // Pre-calculate line loops for each radius to maximize performance
+  // Pre-calculate line loops for each radius
   const orbits = useMemo(() => {
     const segments = 128;
     return radii.map((radius) => {
       const points: THREE.Vector3[] = [];
       for (let i = 0; i <= segments; i++) {
         const theta = (i / segments) * Math.PI * 2;
-        // Calculate coordinate in horizontal XZ plane concentric to Earth
         points.push(
           new THREE.Vector3(
             centerX + Math.cos(theta) * radius,
@@ -42,16 +41,16 @@ export function OrbitPaths({
       {orbits.map((geometry, index) => {
         const isSelected = selectedRingIndex === index;
         const isHovered = hoveredRingIndex === index;
-        
-        let opacity = 0.25;
-        let color = "#fbbf24"; // Warm gold
-        
+
+        let opacity = 0.12;
+        let color = "#ffffff";
+
         if (isSelected) {
-          opacity = 0.85;
-          color = "#ffffff"; // White highlight for selected ring
+          opacity = 0.5;
+          color = "#3b82f6"; // Earth blue accent
         } else if (isHovered) {
-          opacity = 0.55;
-          color = "#fbbf24";
+          opacity = 0.3;
+          color = "#ffffff";
         }
 
         return (

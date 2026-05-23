@@ -46,10 +46,10 @@ export function AsteroidBelt({
     normalMap.repeat.set(1.5, 1.5);
   }
 
-  // Set orbit center coordinates matching Earth
-  const centerX = -3.8;
-  const centerY = 1.8;
-  const centerZ = -2.0;
+  // Orbit center — centered with Earth at origin
+  const centerX = 0;
+  const centerY = 0;
+  const centerZ = 0;
 
   // Initialize the list of asteroids with unique static stats
   const [asteroids, setAsteroids] = useState<AsteroidData[]>(() => {
@@ -147,11 +147,9 @@ export function AsteroidBelt({
   // Generate unique deformed low-poly geometries for each asteroid
   const deformedGeometries = useMemo(() => {
     return asteroids.map((ast) => {
-      // Dodecahedron with 1 detail iteration produces a great low-poly basalt rock
       const geo = new THREE.DodecahedronGeometry(ast.size, 1);
       const posAttr = geo.attributes.position;
       
-      // Seeded random vertex displacement to make irregular basalt structures
       const displacementFactor = ast.size * 0.28;
       
       for (let i = 0; i < posAttr.count; i++) {
@@ -159,7 +157,6 @@ export function AsteroidBelt({
         const vy = posAttr.getY(i);
         const vz = posAttr.getZ(i);
         
-        // Simple trigonometric pseudo-noise displacement based on initial vertex position
         const noise = Math.sin(vx * 15 + ast.mass) * Math.cos(vy * 15 - ast.mass) * Math.sin(vz * 15);
         const factor = 1.0 + noise * displacementFactor;
 
@@ -173,11 +170,10 @@ export function AsteroidBelt({
     });
   }, [asteroids]);
 
-  // Update asteroid positions dynamically as they orbit in the XZ plane centered concentric to Earth
+  // Update asteroid positions dynamically as they orbit
   useFrame((state, delta) => {
     setAsteroids((prev) =>
       prev.map((ast) => {
-        // Adjust angle based on speed
         const nextAngle = ast.angle + ast.orbitSpeed * delta;
         const currentRadius = radii[ast.ringIndex];
         
@@ -188,13 +184,13 @@ export function AsteroidBelt({
           ...ast,
           angle: nextAngle,
           x: nextX,
+          y: centerY,
           z: nextZ,
         };
       })
     );
   });
 
-  // Keep track of active refs for rendering
   const meshesRefs = useRef<(THREE.Mesh | null)[]>([]);
 
   return (
@@ -235,7 +231,7 @@ export function AsteroidBelt({
               receiveShadow
             >
               <meshStandardMaterial
-                color={isSelected ? "#fbbf24" : isHovered ? "#94a3b8" : "#475569"}
+                color={isSelected ? "#3b82f6" : isHovered ? "#cbd5e1" : "#64748b"}
                 roughness={0.9}
                 metalness={0.05}
                 normalMap={normalMap}
@@ -243,20 +239,20 @@ export function AsteroidBelt({
               />
             </mesh>
 
-            {/* Glowing orbital tracking pulse element */}
+            {/* Selection ring — Earth blue */}
             {(isHovered || isSelected) && (
               <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]}>
                 <ringGeometry args={[ast.size * 1.5, ast.size * 1.7, 32]} />
                 <meshBasicMaterial
-                  color={isSelected ? "#fbbf24" : "#fbbf24"}
+                  color={isSelected ? "#3b82f6" : "#ffffff"}
                   transparent={true}
-                  opacity={isSelected ? 0.8 : 0.4}
+                  opacity={isSelected ? 0.7 : 0.3}
                   side={THREE.DoubleSide}
                 />
               </mesh>
             )}
             
-            {/* Asteroid HUD Monospace Label overlay */}
+            {/* Label connector line */}
             {(isHovered || isSelected) && (
               <group position={[0, ast.size + 0.18, 0]}>
                 <line>
@@ -266,7 +262,7 @@ export function AsteroidBelt({
                       args={[new Float32Array([0, 0, 0, 0, -ast.size - 0.12, 0]), 3]}
                     />
                   </bufferGeometry>
-                  <lineBasicMaterial attach="material" color={isSelected ? "#fbbf24" : "#fbbf24"} opacity={0.5} transparent />
+                  <lineBasicMaterial attach="material" color={"#ffffff"} opacity={0.3} transparent />
                 </line>
               </group>
             )}

@@ -4,6 +4,7 @@ import { Suspense, useMemo } from "react";
 import { Canvas } from "@react-three/fiber";
 import * as THREE from "three";
 import { EarthSystem } from "./EarthSystem";
+
 import { OrbitPaths } from "./OrbitPaths";
 import { AsteroidBelt, AsteroidData } from "./AsteroidBelt";
 import { RouteLines } from "./RouteLines";
@@ -29,18 +30,18 @@ function SceneContent({
   // Generate standard 800-particle starry vector field
   const starsGeometry = useMemo(() => {
     const coords: number[] = [];
-    const count = 800;
+    const count = 1200;
     for (let i = 0; i < count; i++) {
-      const radius = 20 + Math.random() * 25;
+      const radius = 30 + Math.random() * 40;
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.acos(Math.random() * 2 - 1);
-      
+
       const x = radius * Math.sin(phi) * Math.cos(theta);
       const y = radius * Math.sin(phi) * Math.sin(theta);
       const z = radius * Math.cos(phi);
       coords.push(x, y, z);
     }
-    
+
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.Float32BufferAttribute(coords, 3));
     return geo;
@@ -51,32 +52,25 @@ function SceneContent({
 
   return (
     <>
-      {/* Cinematic Pitch-black ambient space shading */}
+      {/* Cinematic ambient space shading */}
       <ambientLight intensity={0.06} />
-      
-      {/* Strong directional sunlight source to cast rugged basalt shadows */}
+
+      {/* Bobby's exact sunlight: position=sunDirection, intensity=4.0 */}
       <directionalLight
-        position={[6, 8, 4]}
-        intensity={2.2}
+        position={[-2, 0.5, 1.5]}
+        intensity={4.0}
         castShadow
         shadow-mapSize={[1024, 1024]}
       />
-      
-      {/* Subtle blue/cyan rim accent light from behind Earth */}
-      <directionalLight
-        position={[-8, -4, -6]}
-        color="#38bdf8"
-        intensity={0.65}
-      />
 
-      {/* Dim space starfieldPoints */}
+      {/* Dim space starfield */}
       <points geometry={starsGeometry}>
         <pointsMaterial
-          color="#f8fafc" // Slate 50 white
-          size={0.035}
+          color="#ffffff"
+          size={0.03}
           sizeAttenuation={true}
           transparent={true}
-          opacity={0.22}
+          opacity={0.18}
           depthWrite={false}
         />
       </points>
@@ -84,7 +78,7 @@ function SceneContent({
       {/* Realistic Concentric Earth Globe System */}
       <EarthSystem />
 
-      {/* Concentric Golden Orbit Paths */}
+      {/* Concentric Orbit Paths */}
       <OrbitPaths
         radii={orbitRadii}
         hoveredRingIndex={hoveredRingIndex}
@@ -99,7 +93,7 @@ function SceneContent({
         onHoverRing={onHoverRing}
       />
 
-      {/* Trajectory Intercept Laser Vector */}
+      {/* Trajectory Route Line */}
       <RouteLines selectedAsteroid={selectedAsteroid} />
     </>
   );
@@ -112,13 +106,14 @@ export default function OrbitScene({
   onHoverRing,
 }: OrbitSceneProps) {
   return (
-    <div className="w-full h-full absolute inset-0 z-0 bg-black">
+    <div className="w-full h-screen sticky top-0 z-0 bg-black">
       <Canvas
         shadows
         camera={{
-          position: [0, 3.5, 8.5],
-          fov: 43,
-          up: [0, 1, 0],
+          position: [0, 6, 14],
+          fov: 55,
+          near: 0.1,
+          far: 100,
         }}
         gl={{
           antialias: true,
@@ -127,7 +122,7 @@ export default function OrbitScene({
         }}
         onCreated={({ gl }) => {
           gl.toneMapping = THREE.ACESFilmicToneMapping;
-          gl.toneMappingExposure = 1.0;
+          gl.outputColorSpace = THREE.LinearSRGBColorSpace;
         }}
       >
         <Suspense fallback={null}>
