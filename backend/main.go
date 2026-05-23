@@ -36,7 +36,7 @@ func main() {
 	store := db.New()
 	log.Println("[MAIN] DB store initialized")
 
-	eng := engine.NewEngine()
+	eng := engine.NewEngine(store)
 	log.Printf("[MAIN] Asteroid engine ready | count=%d", eng.Count())
 
 	geminiClient := gemini.NewClient(apiKey)
