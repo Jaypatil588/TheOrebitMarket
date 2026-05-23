@@ -1,169 +1,302 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { formatTelemetryTime } from "@/lib/utils";
 
+// ── Log entries (telemetry feed) ──────────────────────────────────────────────
 export interface LogEntry {
   id: string;
   timestamp: string;
   type: "info" | "success" | "warning" | "error" | "telemetry" | "discovery";
   agentId: string;
   message: string;
-  meta?: any;
+  meta?: unknown;
 }
 
-const AGENTS = ["AH-089", "AH-042", "AH-077", "AH-012"];
-const SECTORS = ["Alpha-4", "Beta-9", "Delta-1", "Gamma-6", "Epsilon-3"];
+// ── Live market data from Agent 2 ─────────────────────────────────────────────
+export interface MarketPrice {
+  mineral: string;
+  price_usd: number;
+  trend: string;
+  change_pct: number;
+  urgency: number;
+  disruption: string;
+  source_url: string;
+  category: string;
+  criticality: number;
+  scenario_adjusted: boolean;
+  fetched_at: string;
+}
 
-const MOCK_MESSAGES = [
+// ── Strategic rankings from Agent 3 ──────────────────────────────────────────
+export interface RankedAsteroid {
+  rank: number;
+  asteroid_id: string;
+  name: string;
+  spec_type: string;
+  composite_score: number;
+  net_value_usd: number;
+  roi: number;
+  top_mineral: string;
+  mineral_urgency: number;
+  delta_v_km_s: number;
+  launch_window_year: number;
+  confidence: number;
+  scenario_boosted: boolean;
+  reasoning: string;
+  trend: string;
+}
+
+export interface RouteStop {
+  order: number;
+  body: string;
+  asteroid_id?: string;
+  mineral_target?: string;
+  extractable_value_usd?: number;
+  stay_duration_days?: number;
+  delta_v_to_next_km_s: number;
+  departure_year?: number;
+}
+
+export interface RouteTotals {
+  total_value_usd: number;
+  total_cost_usd: number;
+  net_return_usd: number;
+  roi_pct: number;
+  duration_years: number;
+  total_delta_v_km_s: number;
+  minerals_covered: string[];
+}
+
+export interface MissionRoute {
+  id: string;
+  label: string;
+  color_hex: string;
+  urgency_score: number;
+  urgency_reason: string;
+  mineral_focus: string[];
+  is_default: boolean;
+  scenario_driven: boolean;
+  stops: RouteStop[];
+  totals: RouteTotals;
+  route_reasoning: string;
+}
+
+// ── Agent status from any agent broadcast ────────────────────────────────────
+export interface AgentStatus {
+  agent: string;
+  status: string;
+  message: string;
+  asteroid_id?: string;
+}
+
+// ── Mission report from Agent 4 ───────────────────────────────────────────────
+export interface MissionReportData {
+  asteroid_id: string;
+  cached: boolean;
+  report: Record<string, unknown>;
+  timestamp: string;
+}
+
+// ── Scenario ──────────────────────────────────────────────────────────────────
+export interface Scenario {
+  id: string;
+  description: string;
+  affected_minerals: string[];
+  severity: number;
+  active: boolean;
+  created_at: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+const MOCK_AGENTS = ["AH-089", "AH-042", "AH-077", "AH-012"];
+const MOCK_SECTORS = ["Alpha-4", "Beta-9", "Delta-1", "Gamma-6"];
+const MOCK_NAMES = ["Bennu-X", "Apophis-Beta", "16-Psyche", "Eros-Prime", "Ryugu-Alpha"];
+const MOCK_MSGS = [
   { type: "info", message: "Radar ping dispatched to Sector {sector}." },
   { type: "telemetry", message: "Concentric orbit synchronization locked. Pitch 45.0°." },
   { type: "discovery", message: "Asteroid '{name}' identified in Orbit Ring {ring}." },
-  { type: "success", message: "Basalt rock composition analyzed: {composition}." },
-  { type: "info", message: "Drone {drone} starting spectral scanning sequence." },
-  { type: "warning", message: "Orbit Ring {ring} showing minor gravitational deviation (+0.04m/s²)." },
-  { type: "telemetry", message: "Position updated: {coords}." },
-  { type: "success", message: "Mining route computed. Fuel efficiency factor: 94.2%." },
-  { type: "info", message: "Downloading raw laser reflectometry profiles..." },
+  { type: "success", message: "Basalt rock composition analyzed: {comp}." },
   { type: "warning", message: "Solar wind interference detected. Adjusting filter bandwidth." },
+  { type: "info", message: "Downloading raw laser reflectometry profiles..." },
 ];
 
-const ASTEROID_NAMES = ["Bennu-X", "Apophis-Beta", "16-Psyche", "Eros-Prime", "Ceres-Minor", "Castalia-9", "Itokawa-1", "Ryugu-Alpha"];
-
-export function useWebSockets(url?: string) {
+export function useOrebitWebSocket(url?: string) {
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [marketPrices, setMarketPrices] = useState<MarketPrice[]>([]);
+  const [rankings, setRankings] = useState<RankedAsteroid[]>([]);
+  const [routes, setRoutes] = useState<MissionRoute[]>([]);
+  const [agentStatuses, setAgentStatuses] = useState<Record<string, AgentStatus>>({});
+  const [missionReport, setMissionReport] = useState<MissionReportData | null>(null);
+  const [connected, setConnected] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
 
-  // Initialize with some realistic baseline log history
+  // Seed initial mock telemetry on mount
   useEffect(() => {
-    const initialLogs: LogEntry[] = [];
     const now = new Date();
-    
-    // Build initial log items going backwards in time
-    for (let i = 8; i >= 0; i--) {
-      const pastTime = new Date(now.getTime() - i * 8000);
-      const agent = AGENTS[Math.floor(Math.random() * AGENTS.length)];
-      const sector = SECTORS[Math.floor(Math.random() * SECTORS.length)];
-      const ring = Math.floor(Math.random() * 4) + 1;
-      const name = ASTEROID_NAMES[Math.floor(Math.random() * ASTEROID_NAMES.length)];
-      
-      let message = "Telemetry scanning online.";
-      let type: any = "info";
-      
-      if (i === 8) {
-        message = "THE OREBIT MARKET Telemetry Core initializing...";
-        type = "info";
-      } else if (i === 7) {
-        message = `Establishing link to satellite receivers in Sector ${sector}.`;
-        type = "info";
-      } else if (i === 6) {
-        message = "Websocket server connection listening on ws://localhost:8080/feed";
-        type = "warning";
-      } else if (i === 5) {
-        message = `Autonomous search agents deployed. Monitoring 5 concentric rings.`;
-        type = "success";
-      } else {
-        const randMsg = MOCK_MESSAGES[i % MOCK_MESSAGES.length];
-        type = randMsg.type;
-        message = randMsg.message
-          .replace("{sector}", sector)
-          .replace("{ring}", ring.toString())
-          .replace("{name}", name)
-          .replace("{drone}", `AH-D${Math.floor(Math.random() * 9) + 1}`)
-          .replace("{composition}", "84% basalt, 12% iron, 4% silicates")
-          .replace("{coords}", `X:+${(Math.random() * 2).toFixed(4)} Y:-1.2000 Z:${(Math.random() * 5).toFixed(4)}`);
-      }
-
-      initialLogs.push({
+    const seed: LogEntry[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const t = new Date(now.getTime() - i * 7000);
+      seed.push({
         id: `init-${i}`,
-        timestamp: formatTelemetryTime(pastTime),
-        type,
-        agentId: agent,
-        message,
+        timestamp: formatTelemetryTime(t),
+        type: i === 6 ? "info" : i === 5 ? "success" : "telemetry",
+        agentId: MOCK_AGENTS[i % MOCK_AGENTS.length],
+        message: i === 6
+          ? "THE OREBIT MARKET telemetry core initializing..."
+          : i === 5
+          ? "Agent swarm deployed. Market feed + valuation pipeline active."
+          : `Telemetry link established to ${MOCK_SECTORS[i % MOCK_SECTORS.length]}.`,
       });
     }
-    
-    setLogs(initialLogs);
+    setLogs(seed);
   }, []);
 
-  // Connect to actual WS server if provided, otherwise simulate
+  // WebSocket connection + message routing
   useEffect(() => {
-    if (url) {
-      try {
-        const socket = new WebSocket(url);
-        socketRef.current = socket;
+    if (!url) return;
 
-        socket.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            const newEntry: LogEntry = {
-              id: Math.random().toString(36).substr(2, 9),
-              timestamp: formatTelemetryTime(new Date()),
-              type: data.type || "info",
-              agentId: data.agentId || AGENTS[0],
-              message: data.message || "",
-              meta: data.meta || null
-            };
-            setLogs((prev) => [...prev.slice(-49), newEntry]); // Keep last 50 logs
-          } catch (e) {
-            console.error("Failed to parse WebSocket event:", e);
-          }
-        };
-
-        socket.onerror = (err) => {
-          console.warn("WebSocket experienced error, falling back to dynamic simulated telemetry.", err);
-        };
-
-        return () => {
-          socket.close();
-        };
-      } catch (err) {
-        console.warn("WebSocket connection failed, starting dynamic simulated telemetry.", err);
-      }
+    let ws: WebSocket;
+    try {
+      ws = new WebSocket(url);
+      socketRef.current = ws;
+    } catch {
+      return;
     }
 
-    // Dynamic telemetry generator (runs when no websocket is active)
-    const interval = setInterval(() => {
-      const agent = AGENTS[Math.floor(Math.random() * AGENTS.length)];
-      const sector = SECTORS[Math.floor(Math.random() * SECTORS.length)];
-      const ring = Math.floor(Math.random() * 4) + 1;
-      const name = ASTEROID_NAMES[Math.floor(Math.random() * ASTEROID_NAMES.length)];
-      const randMsg = MOCK_MESSAGES[Math.floor(Math.random() * MOCK_MESSAGES.length)];
-      
-      const compVal = `${(80 + Math.random() * 15).toFixed(1)}% basalt, ${(2 + Math.random() * 8).toFixed(1)}% magnetite, ${(0.1 + Math.random() * 1.5).toFixed(2)}% platinum group metals`;
-      const coordsVal = `X:+${(Math.random() * 4 - 2).toFixed(4)} Y:-1.2000 Z:${(Math.random() * 6 - 3).toFixed(4)}`;
-      
-      const formattedMessage = randMsg.message
-        .replace("{sector}", sector)
-        .replace("{ring}", ring.toString())
-        .replace("{name}", name)
-        .replace("{drone}", `AH-D${Math.floor(Math.random() * 9) + 1}`)
-        .replace("{composition}", compVal)
-        .replace("{coords}", coordsVal);
+    ws.onopen = () => {
+      setConnected(true);
+      console.log("[WS] Connected to", url);
+    };
 
-      const newLog: LogEntry = {
+    ws.onclose = () => {
+      setConnected(false);
+      console.log("[WS] Disconnected");
+    };
+
+    ws.onerror = () => {
+      console.warn("[WS] Connection error — falling back to mock telemetry");
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data as string);
+
+        switch (data.type) {
+          case "market_update":
+            if (Array.isArray(data.prices)) {
+              setMarketPrices(data.prices);
+            }
+            break;
+
+          case "rankings_update":
+            if (Array.isArray(data.rankings)) setRankings(data.rankings);
+            if (Array.isArray(data.routes)) setRoutes(data.routes);
+            break;
+
+          case "agent1_complete":
+            addLog("success", "AH-001",
+              `Valuation complete — ${data.valuations_count} asteroids valued in ${Math.round(data.elapsed_seconds)}s`);
+            break;
+
+          case "mission_report":
+            setMissionReport({
+              asteroid_id: data.asteroid_id,
+              cached: data.cached,
+              report: data.report,
+              timestamp: data.timestamp,
+            });
+            break;
+
+          case "agent_status": {
+            const status: AgentStatus = {
+              agent: data.agent,
+              status: data.status,
+              message: data.message,
+              asteroid_id: data.asteroid_id,
+            };
+            setAgentStatuses((prev) => ({ ...prev, [data.agent]: status }));
+            // Also surface as a log entry
+            const logType = data.status === "error" ? "error"
+              : data.status === "active" ? "info"
+              : "success";
+            addLog(logType, agentIdFor(data.agent), data.message);
+            break;
+          }
+
+          default:
+            // Legacy LogEntry format or unknown — surface as telemetry log
+            addLog(data.type || "info", data.agentId || data.agent || "SYSTEM", data.message || JSON.stringify(data));
+        }
+      } catch (e) {
+        console.error("[WS] Parse error:", e);
+      }
+    };
+
+    return () => ws.close();
+  }, [url]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Mock telemetry ticker (runs regardless — supplements real logs when connected)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (connected) return; // let real WS drive logs when live
+      const sector = MOCK_SECTORS[Math.floor(Math.random() * MOCK_SECTORS.length)];
+      const ring = Math.floor(Math.random() * 4) + 1;
+      const name = MOCK_NAMES[Math.floor(Math.random() * MOCK_NAMES.length)];
+      const msg = MOCK_MSGS[Math.floor(Math.random() * MOCK_MSGS.length)];
+      const text = msg.message
+        .replace("{sector}", sector)
+        .replace("{ring}", String(ring))
+        .replace("{name}", name)
+        .replace("{comp}", `${(80 + Math.random() * 15).toFixed(1)}% basalt, ${(0.1 + Math.random() * 1.5).toFixed(2)}% PGMs`);
+      addLog(msg.type as LogEntry["type"], MOCK_AGENTS[Math.floor(Math.random() * MOCK_AGENTS.length)], text);
+    }, 4500);
+    return () => clearInterval(interval);
+  }, [connected]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const addLog = useCallback((type: LogEntry["type"], agentId: string, message: string) => {
+    setLogs((prev) => [
+      ...prev.slice(-49),
+      {
         id: Math.random().toString(36).substring(2, 9),
         timestamp: formatTelemetryTime(new Date()),
-        type: randMsg.type as any,
-        agentId: agent,
-        message: formattedMessage,
-      };
+        type,
+        agentId,
+        message,
+      },
+    ]);
+  }, []);
 
-      setLogs((prev) => [...prev.slice(-49), newLog]);
-    }, 4500); // New telemetry log every 4.5 seconds
+  const addManualLog = useCallback((message: string, type: LogEntry["type"] = "info", agentId = "USER") => {
+    addLog(type, agentId, message);
+  }, [addLog]);
 
-    return () => clearInterval(interval);
-  }, [url]);
-
-  const addManualLog = (message: string, type: LogEntry["type"] = "info", agentId: string = "USER") => {
-    const newLog: LogEntry = {
-      id: `manual-${Date.now()}`,
-      timestamp: formatTelemetryTime(new Date()),
-      type,
-      agentId,
-      message,
-    };
-    setLogs((prev) => [...prev.slice(-49), newLog]);
+  return {
+    logs,
+    marketPrices,
+    rankings,
+    routes,
+    agentStatuses,
+    missionReport,
+    connected,
+    addManualLog,
   };
+}
 
+// Backward-compat alias — existing callers of useWebSockets still work
+export function useWebSockets(url?: string) {
+  const { logs, addManualLog } = useOrebitWebSocket(url);
   return { logs, addManualLog };
 }
+
 export type UseWebSocketsReturn = ReturnType<typeof useWebSockets>;
+
+// Maps agent ID string to short display ID
+function agentIdFor(agent: string): string {
+  const map: Record<string, string> = {
+    market_feed: "AH-002",
+    valuation: "AH-001",
+    targeting: "AH-003",
+    mission_report: "AH-004",
+  };
+  return map[agent] ?? "AH-000";
+}
