@@ -42,14 +42,14 @@ export function OrbitPaths({
         const isSelected = selectedRingIndex === index;
         const isHovered = hoveredRingIndex === index;
 
-        let opacity = 0.12;
+        let opacity = 0.35;
         let color = "#ffffff";
 
         if (isSelected) {
-          opacity = 0.5;
+          opacity = 0.9;
           color = "#3b82f6"; // Earth blue accent
         } else if (isHovered) {
-          opacity = 0.3;
+          opacity = 0.65;
           color = "#ffffff";
         }
 

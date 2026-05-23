@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useMemo } from "react";
+import { Suspense, useMemo, useRef } from "react";
 import { Canvas } from "@react-three/fiber";
 import * as THREE from "three";
 import { EarthSystem } from "./EarthSystem";
@@ -27,6 +27,11 @@ function SceneContent({
   // Execute smooth camera transitions & drift updates
   useCameraControls(selectedAsteroid);
 
+  // SpotLight needs a real Object3D target — target-position prop doesn't work in R3F.
+  // We create a dummy object3D placed at the center of the right-hand asteroid region and
+  // pass it as the SpotLight's target so the cone genuinely aims there.
+  const spotTargetRef = useRef<THREE.Object3D>(new THREE.Object3D());
+
   const orbitRadii = useMemo(() => {
     const arr = [];
     for (let i = 0; i < 50; i++) {
@@ -38,21 +43,38 @@ function SceneContent({
 
   return (
     <>
-      {/* Cinematic ambient space shading for base illumination on all sides */}
-      <ambientLight intensity={0.45} />
+      {/* Base ambient fill — just enough so nothing is ever 100% black */}
+      <ambientLight intensity={0.25} />
 
-      {/* Primary strong sunlight pointing from top-left-front */}
+      {/* Hemisphere bounce light — simulates soft reflected light from Earth (blue sky) and deep space (dark ground) */}
+      <hemisphereLight
+        color="#1e3a5f"
+        groundColor="#0a0a0a"
+        intensity={0.6}
+      />
+
+      {/* Primary strong sunlight pointing from the general camera direction (top-left-front) */}
       <directionalLight
-        position={[-2, 0.5, 1.5]}
-        intensity={4.0}
+        position={[-8, 16, 24]}
+        intensity={6.0}
         castShadow
         shadow-mapSize={[1024, 1024]}
       />
 
-      {/* Secondary fill light pointing from the opposite side (bottom-right-back) */}
-      <directionalLight
-        position={[2, -0.5, -1.5]}
-        intensity={1.5}
+      {/* Invisible target object that the SpotLight cone aims at.
+          Positioned at the center of the right-hand asteroid belt region. */}
+      <primitive object={spotTargetRef.current} position={[8, 4, 10]} />
+
+      {/* Targeted SpotLight for the right-hand asteroid belt region only.
+          Uses a real Object3D target ref so the cone genuinely points there. */}
+      <spotLight
+        position={[18, 25, 20]}
+        target={spotTargetRef.current}
+        angle={Math.PI / 5}
+        penumbra={0.4}
+        intensity={200}
+        distance={80}
+        decay={2}
       />
 
       {/* Realistic Concentric Earth Globe System */}

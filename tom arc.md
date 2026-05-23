@@ -1,4 +1,4 @@
-# AstroHedge — System Architecture
+# the orebit market — System Architecture
 
 ## One-liner
 A real-time asteroid intelligence radar that tracks NEAs, values them against live markets, plans missions, and tells you which ones matter most right now.

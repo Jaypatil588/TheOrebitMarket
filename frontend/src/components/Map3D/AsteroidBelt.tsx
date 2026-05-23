@@ -203,21 +203,21 @@ export function AsteroidBelt({
 
         // Determine authentic space-rock coloration based on taxonomic class mapping
         const spec = ast.spec_type || ast.specType || "C";
-        let rockColor = "#404145"; // fallback charcoal
+        let rockColor = "#8a8d93"; // fallback medium warm grey
         if (isSelected) {
-          rockColor = "#3b82f6"; // Selected light blue glow accent
+          rockColor = "#3b82f6"; // Selected bright celestial blue highlight
         } else if (isHovered) {
-          rockColor = "#94a3b8"; // Hover slate highlight
+          rockColor = "#cbd5e1"; // Hover bright slate highlight
         } else {
           switch (spec) {
             case "C": // Carbonaceous
-              rockColor = "#2c2d30"; // Very dark, carbonaceous slate grey
+              rockColor = "#8a8d93"; // Medium warm grey — visible in shadow
               break;
             case "S": // Silicaceous / Stony
-              rockColor = "#5e5954"; // Stony silicate brown-grey
+              rockColor = "#b5a898"; // Warm sandy stone like sandstone/feldspar
               break;
             case "M": // Metallic
-              rockColor = "#7c726a"; // Rusty oxidized iron-nickel grey
+              rockColor = "#a89080"; // Warm iron-rust / nickel alloy coloring
               break;
           }
         }
@@ -242,8 +242,8 @@ export function AsteroidBelt({
               <meshStandardMaterial
                 map={colorMap}
                 color={rockColor}
-                roughness={0.96}
-                metalness={spec === "M" ? 0.22 : 0.08}
+                roughness={0.88}
+                metalness={spec === "M" ? 0.25 : 0.08}
                 normalMap={normalMap}
                 normalScale={new THREE.Vector2(0.9, 0.9)}
               />
