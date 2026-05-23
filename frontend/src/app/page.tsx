@@ -7,36 +7,54 @@ import { StrategicRankings } from "@/components/sections/StrategicRankings";
 import { AgentActivity } from "@/components/sections/AgentActivity";
 import { MarketIntel } from "@/components/sections/MarketIntel";
 import { AsteroidData } from "@/components/Map3D/AsteroidBelt";
+import { useOrebitWebSocket, Scenario } from "@/hooks/useWebSockets";
 
-// Dynamically import OrbitScene (R3F Canvas) with SSR disabled
 const OrbitScene = dynamic(() => import("@/components/Map3D/OrbitScene"), {
   ssr: false,
 });
 
+const WS_URL = "ws://localhost:8080/feed";
+
 export default function Home() {
   const [selectedAsteroid, setSelectedAsteroid] = useState<AsteroidData | null>(null);
   const [hoveredRingIndex, setHoveredRingIndex] = useState<number | null>(null);
+  const [activeScenarios, setActiveScenarios] = useState<Scenario[]>([]);
 
-  // Esc key unselects the selected asteroid
+  // WebSocket connection — all agent data flows through here
+  const { marketPrices, rankings, routes, agentStatuses } = useOrebitWebSocket(WS_URL);
+
+  // Fetch active scenarios from backend on mount
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setSelectedAsteroid(null);
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
+    fetch("http://localhost:8080/api/scenarios")
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data.scenarios)) {
+          setActiveScenarios(data.scenarios.filter((s: Scenario) => s.active));
+        }
+      })
+      .catch(() => {}); // backend may not be running
   }, []);
 
-  const handleSelectAsteroid = (asteroid: AsteroidData | null) => {
-    setSelectedAsteroid(asteroid);
+  // Esc key unselects asteroid
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelectedAsteroid(null);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  const handleScenarioInjected = (sc: Scenario) => {
+    setActiveScenarios((prev) => [sc, ...prev]);
+  };
+
+  const handleScenarioRemoved = (id: string) => {
+    setActiveScenarios((prev) => prev.filter((s) => s.id !== id));
   };
 
   return (
     <main className="relative bg-black select-none">
-      {/* Floating Glassmorphism Back Button */}
+      {/* Back button when asteroid selected */}
       {selectedAsteroid && (
         <button
           onClick={() => setSelectedAsteroid(null)}
@@ -59,7 +77,7 @@ export default function Home() {
       <section className="snap-section relative h-screen">
         <OrbitScene
           selectedAsteroid={selectedAsteroid}
-          onSelectAsteroid={handleSelectAsteroid}
+          onSelectAsteroid={setSelectedAsteroid}
           hoveredRingIndex={hoveredRingIndex}
           onHoverRing={setHoveredRingIndex}
         />
@@ -67,13 +85,18 @@ export default function Home() {
       </section>
 
       {/* Section 2: Strategic Rankings */}
-      <StrategicRankings />
+      <StrategicRankings rankings={rankings} routes={routes} />
 
       {/* Section 3: Agent Activity */}
-      <AgentActivity />
+      <AgentActivity agentStatuses={agentStatuses} />
 
-      {/* Section 4: Market Intelligence */}
-      <MarketIntel />
+      {/* Section 4: Market Intelligence + Scenario Injection */}
+      <MarketIntel
+        prices={marketPrices}
+        activeScenarios={activeScenarios}
+        onScenarioInjected={handleScenarioInjected}
+        onScenarioRemoved={handleScenarioRemoved}
+      />
     </main>
   );
 }
