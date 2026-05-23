@@ -11,13 +11,13 @@ interface AsteroidPosition {
 export function useCameraControls(selectedAsteroid: AsteroidPosition | null) {
   const { camera } = useThree();
   
-  // Camera defaults for centered Earth — pulled back to see full globe + orbits
-  const originalPosition = useRef(new THREE.Vector3(0, 6, 14));
-  const targetPosition = useRef(new THREE.Vector3(0, 6, 14));
+  // Camera defaults for Earth position — offset by [-6, 4, 5]
+  const originalPosition = useRef(new THREE.Vector3(-6, 10, 19));
+  const targetPosition = useRef(new THREE.Vector3(-6, 10, 19));
   
   // Look at the center of the scene (Earth)
-  const lookAtTarget = useRef(new THREE.Vector3(0, 0, 0));
-  const targetLookAt = useRef(new THREE.Vector3(0, 0, 0));
+  const lookAtTarget = useRef(new THREE.Vector3(-6, 4, 5));
+  const targetLookAt = useRef(new THREE.Vector3(-6, 4, 5));
 
   // Handle selected asteroid changes
   useEffect(() => {
@@ -37,7 +37,7 @@ export function useCameraControls(selectedAsteroid: AsteroidPosition | null) {
     } else {
       // Return to global view
       targetPosition.current.copy(originalPosition.current);
-      targetLookAt.current.set(0, 0, 0);
+      targetLookAt.current.set(-6, 4, 5);
     }
   }, [selectedAsteroid]);
 
