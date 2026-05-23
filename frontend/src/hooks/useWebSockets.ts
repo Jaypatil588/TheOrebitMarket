@@ -49,7 +49,7 @@ export function useWebSockets(url?: string) {
       let type: any = "info";
       
       if (i === 8) {
-        message = "ASTROHEDGE Telemetry Core initializing...";
+        message = "THE OREBIT MARKET Telemetry Core initializing...";
         type = "info";
       } else if (i === 7) {
         message = `Establishing link to satellite receivers in Sector ${sector}.`;
