@@ -68,9 +68,6 @@ export default function Home() {
         onHoverRing={setHoveredRingIndex}
       />
 
-      {/* 2. Sleek CRT Scanline Decorative Effect Overlay */}
-      <div className="scanlines" />
-
       {/* 3. Floating HUD: Absolute Left (Asteroid Data) */}
       <AsteroidDetail
         selectedAsteroid={selectedAsteroid}
@@ -82,17 +79,6 @@ export default function Home() {
         logs={logs}
         onManualTriggerPing={handleForceSatellitePing}
       />
-
-      {/* 5. Minimal Decorative Top HUD Header */}
-      <div className="absolute top-6 left-6 z-10 pointer-events-none font-mono text-[9px] text-slate-500 space-y-1">
-        <div className="flex items-center gap-1.5">
-          <span className="text-amber-500 font-bold">▲</span>
-          <span className="tracking-widest text-slate-400 font-semibold">ASTROHEDGE NETWORK v1.0.4</span>
-        </div>
-        <div className="tracking-wide">
-          SYSTEM LATENCY: <span className="text-emerald-400">14ms</span> {"//"} LINK STABILITY: <span className="text-emerald-400">99.87%</span>
-        </div>
-      </div>
     </main>
   );
 }
