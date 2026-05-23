@@ -46,10 +46,10 @@ export function AsteroidBelt({
     normalMap.repeat.set(1.5, 1.5);
   }
 
-  // Orbit center — centered with Earth at origin
-  const centerX = 0;
-  const centerY = 0;
-  const centerZ = 0;
+  // Orbit center — centered with Earth
+  const centerX = -6;
+  const centerY = 4;
+  const centerZ = 5;
 
   // Initialize the list of asteroids with unique static stats
   const [asteroids] = useState<AsteroidData[]>(() => {
