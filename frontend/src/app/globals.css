@@ -2,9 +2,43 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ═══════════════════════════════════════════════════
+   THE OREBIT MARKET — Interstellar Design System
+   Palette: void black, star white, Earth blue accent
+   ═══════════════════════════════════════════════════ */
+
 :root {
-  --background: #000000;
-  --foreground: #f8fafc; /* slate-50 */
+  /* Core palette */
+  --void: #000000;
+  --star: #ffffff;
+  --dust: #a1a1aa;        /* zinc-400 */
+  --dust-dim: #71717a;    /* zinc-500 */
+  --orbit: rgba(255, 255, 255, 0.08);
+
+  /* Accent — derived from Earth's atmosphere shader */
+  --earth-blue: #3b82f6;
+  --earth-glow: rgba(59, 130, 246, 0.12);
+  --earth-border: rgba(59, 130, 246, 0.2);
+
+  /* Semantic */
+  --signal: #22d3ee;       /* cyan-400 — live/active */
+  --danger: #ef4444;       /* red-500 */
+  --positive: #34d399;     /* emerald-400 */
+  --warning: #fbbf24;      /* amber-400 */
+
+  /* Surfaces */
+  --glass-bg: rgba(0, 0, 0, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.06);
+  --glass-blur: 20px;
+
+  /* Typography */
+  --font-display: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+html {
+  scroll-snap-type: y mandatory;
+  scroll-behavior: smooth;
 }
 
 html, body {
@@ -12,74 +46,187 @@ html, body {
   padding: 0;
   width: 100%;
   height: 100%;
-  background-color: #000000;
-  color: #f8fafc;
-  overflow: hidden;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  user-select: none;
+  background-color: var(--void);
+  color: var(--star);
+  font-family: var(--font-display);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Custom Glassmorphism classes */
-.glass-panel {
-  background: rgba(8, 10, 15, 0.45);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(217, 119, 6, 0.15); /* Orange/Amber tint */
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
-}
+/* ── Snap Scroll Sections ────────────────────────── */
 
-.glass-panel-active {
-  background: rgba(12, 16, 24, 0.65);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(217, 119, 6, 0.35);
-  box-shadow: 0 0 25px rgba(217, 119, 6, 0.15);
-}
-
-/* Scrollbar styles for the log feed */
-.custom-scrollbar::-webkit-scrollbar {
-  width: 3px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.2);
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(217, 119, 6, 0.3);
-  border-radius: 9px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(217, 119, 6, 0.6);
-}
-
-/* Scanning scanline effect */
-.scanlines {
-  position: absolute;
-  top: 0;
-  left: 0;
+.snap-section {
+  scroll-snap-align: start;
+  min-height: 100vh;
   width: 100%;
+  position: relative;
+}
+
+/* ── Glass Card System ───────────────────────────── */
+
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+}
+
+.glass-card-hover {
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.glass-card-hover:hover {
+  border-color: var(--earth-border);
+  box-shadow: 0 0 40px rgba(59, 130, 246, 0.06);
+}
+
+/* ── Agent Status Indicators ─────────────────────── */
+
+@keyframes pulse-signal {
+  0%, 100% { opacity: 0.4; box-shadow: 0 0 0 0 var(--signal); }
+  50% { opacity: 1; box-shadow: 0 0 8px 2px var(--signal); }
+}
+
+.pulse-active {
+  animation: pulse-signal 2s infinite ease-in-out;
+}
+
+@keyframes pulse-idle {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 0.5; }
+}
+
+.pulse-idle {
+  animation: pulse-idle 3s infinite ease-in-out;
+}
+
+/* ── Scroll Indicator ────────────────────────────── */
+
+@keyframes float-down {
+  0%, 100% { transform: translateY(0); opacity: 0.4; }
+  50% { transform: translateY(8px); opacity: 0.8; }
+}
+
+.scroll-indicator {
+  animation: float-down 2.5s infinite ease-in-out;
+}
+
+/* ── Section Entry Animations ────────────────────── */
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.8s ease-out forwards;
+}
+
+/* Staggered children */
+.stagger-children > * {
+  opacity: 0;
+  animation: fade-up 0.6s ease-out forwards;
+}
+
+.stagger-children > *:nth-child(1) { animation-delay: 0.1s; }
+.stagger-children > *:nth-child(2) { animation-delay: 0.2s; }
+.stagger-children > *:nth-child(3) { animation-delay: 0.3s; }
+.stagger-children > *:nth-child(4) { animation-delay: 0.4s; }
+.stagger-children > *:nth-child(5) { animation-delay: 0.5s; }
+.stagger-children > *:nth-child(6) { animation-delay: 0.6s; }
+.stagger-children > *:nth-child(7) { animation-delay: 0.7s; }
+.stagger-children > *:nth-child(8) { animation-delay: 0.8s; }
+
+/* ── Data Table ──────────────────────────────────── */
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.data-table thead th {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dust-dim);
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--orbit);
+}
+
+.data-table tbody tr {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  transition: background-color 0.2s ease;
+  cursor: pointer;
+}
+
+.data-table tbody tr:hover {
+  background-color: var(--earth-glow);
+}
+
+.data-table tbody td {
+  padding: 14px 16px;
+  white-space: nowrap;
+}
+
+/* ── Scrollbar (minimal) ─────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* ── Urgency / Scarcity Bars ─────────────────────── */
+
+.bar-track {
+  height: 4px;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.bar-fill {
   height: 100%;
-  background: linear-gradient(
-    rgba(18, 16, 16, 0) 50%, 
-    rgba(0, 0, 0, 0.25) 50%
-  ), linear-gradient(
-    90deg,
-    rgba(255, 0, 0, 0.03),
-    rgba(0, 255, 0, 0.01),
-    rgba(0, 0, 255, 0.03)
-  );
-  background-size: 100% 4px, 3px 100%;
-  pointer-events: none;
-  z-index: 100;
+  border-radius: 2px;
+  transition: width 0.6s ease-out;
 }
 
-/* Telemetry blinkers */
-@keyframes pulse-telemetry {
-  0%, 100% { opacity: 0.3; }
-  50% { opacity: 1; }
-}
+/* ── Trend Indicators ────────────────────────────── */
 
-.pulse-led {
-  animation: pulse-telemetry 2s infinite ease-in-out;
-}
+.trend-up { color: var(--positive); }
+.trend-down { color: var(--danger); }
+.trend-flat { color: var(--dust-dim); }
+
+/* ── Utility ─────────────────────────────────────── */
+
+.font-mono { font-family: var(--font-mono); }
+.text-dust { color: var(--dust); }
+.text-dust-dim { color: var(--dust-dim); }
+.text-earth { color: var(--earth-blue); }
+.text-signal { color: var(--signal); }
+.bg-earth-glow { background-color: var(--earth-glow); }
+.border-orbit { border-color: var(--orbit); }
