@@ -123,6 +123,15 @@ func (s *Store) migrate() error {
 			created_at        TIMESTAMPTZ DEFAULT NOW(),
 			expires_at        TIMESTAMPTZ
 		)`,
+		// Raw asteroid records — seeded from disk JSON on first boot
+		`CREATE TABLE IF NOT EXISTS raw_asteroids (
+			id        TEXT PRIMARY KEY,
+			name      TEXT,
+			spec_type TEXT,
+			value_usd NUMERIC(30,2),
+			data      JSONB NOT NULL
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_raw_asteroids_value ON raw_asteroids(value_usd DESC)`,
 	}
 
 	for _, q := range queries {
