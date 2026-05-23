@@ -46,7 +46,7 @@ function SceneContent({
     return geo;
   }, []);
 
-  const orbitRadii = [3.2, 4.4, 5.6, 6.8, 8.0];
+  const orbitRadii = [5.6, 6.1, 6.6, 7.1, 7.6];
   const selectedRingIndex = selectedAsteroid !== null ? selectedAsteroid.ringIndex : null;
 
   return (

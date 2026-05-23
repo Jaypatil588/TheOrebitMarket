@@ -8,10 +8,15 @@ interface OrbitPathsProps {
 }
 
 export function OrbitPaths({
-  radii = [3.2, 4.4, 5.6, 6.8, 8.0],
+  radii = [5.6, 6.1, 6.6, 7.1, 7.6],
   hoveredRingIndex,
   selectedRingIndex,
 }: OrbitPathsProps) {
+  // Center of orbits matching Earth's off-screen top-left position
+  const centerX = -3.8;
+  const centerY = 1.8; // Lowered along Y axis to wrap the southern hemisphere of Earth
+  const centerZ = -2.0;
+
   // Pre-calculate line loops for each radius to maximize performance
   const orbits = useMemo(() => {
     const segments = 128;
@@ -19,12 +24,18 @@ export function OrbitPaths({
       const points: THREE.Vector3[] = [];
       for (let i = 0; i <= segments; i++) {
         const theta = (i / segments) * Math.PI * 2;
-        // Calculate coordinate in horizontal XZ plane, depressed on Y axis
-        points.push(new THREE.Vector3(Math.cos(theta) * radius, -1.2, Math.sin(theta) * radius));
+        // Calculate coordinate in horizontal XZ plane concentric to Earth
+        points.push(
+          new THREE.Vector3(
+            centerX + Math.cos(theta) * radius,
+            centerY,
+            centerZ + Math.sin(theta) * radius
+          )
+        );
       }
       return new THREE.BufferGeometry().setFromPoints(points);
     });
-  }, [radii]);
+  }, [radii, centerX, centerY, centerZ]);
 
   return (
     <group>
@@ -32,16 +43,15 @@ export function OrbitPaths({
         const isSelected = selectedRingIndex === index;
         const isHovered = hoveredRingIndex === index;
         
-        // Dynamically shift brightness based on interaction state
-        let opacity = 0.15;
-        let color = "#d97706"; // Amber gold
+        let opacity = 0.25;
+        let color = "#fbbf24"; // Warm gold
         
         if (isSelected) {
-          opacity = 0.75;
-          color = "#fbbf24"; // Bright amber gold
+          opacity = 0.85;
+          color = "#ffffff"; // White highlight for selected ring
         } else if (isHovered) {
-          opacity = 0.45;
-          color = "#f59e0b"; // Medium amber gold
+          opacity = 0.55;
+          color = "#fbbf24";
         }
 
         return (

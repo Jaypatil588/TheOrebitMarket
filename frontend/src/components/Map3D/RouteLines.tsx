@@ -7,8 +7,8 @@ interface RouteLinesProps {
 }
 
 export function RouteLines({ selectedAsteroid }: RouteLinesProps) {
-  // Position of Earth's core
-  const earthCenter = useMemo(() => new THREE.Vector3(0, 2.5, -2.5), []);
+  // Position of Earth's core matching EarthSystem positioning
+  const earthCenter = useMemo(() => new THREE.Vector3(-3.8, 3.8, -2.0), []);
 
   // Pre-calculate line and geometry using useMemo
   const lineObject = useMemo(() => {
