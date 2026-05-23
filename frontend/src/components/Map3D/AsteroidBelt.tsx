@@ -52,7 +52,7 @@ export function AsteroidBelt({
   const centerZ = 0;
 
   // Initialize the list of asteroids with unique static stats
-  const [asteroids, setAsteroids] = useState<AsteroidData[]>(() => {
+  const [asteroids] = useState<AsteroidData[]>(() => {
     const list: Omit<AsteroidData, "x" | "y" | "z">[] = [
       {
         id: "ast-01",
@@ -170,28 +170,24 @@ export function AsteroidBelt({
     });
   }, [asteroids]);
 
+  const groupRefs = useRef<(THREE.Group | null)[]>([]);
+  const anglesRef = useRef(asteroids.map(a => a.angle));
+
   // Update asteroid positions dynamically as they orbit
   useFrame((state, delta) => {
-    setAsteroids((prev) =>
-      prev.map((ast) => {
-        const nextAngle = ast.angle + ast.orbitSpeed * delta;
-        const currentRadius = radii[ast.ringIndex];
-        
-        const nextX = centerX + Math.cos(nextAngle) * currentRadius;
-        const nextZ = centerZ + Math.sin(nextAngle) * currentRadius;
-        
-        return {
-          ...ast,
-          angle: nextAngle,
-          x: nextX,
-          y: centerY,
-          z: nextZ,
-        };
-      })
-    );
+    asteroids.forEach((ast, index) => {
+      const nextAngle = anglesRef.current[index] + ast.orbitSpeed * delta;
+      anglesRef.current[index] = nextAngle;
+      
+      const currentRadius = radii[ast.ringIndex];
+      const nextX = centerX + Math.cos(nextAngle) * currentRadius;
+      const nextZ = centerZ + Math.sin(nextAngle) * currentRadius;
+      
+      if (groupRefs.current[index]) {
+        groupRefs.current[index]!.position.set(nextX, centerY, nextZ);
+      }
+    });
   });
-
-  const meshesRefs = useRef<(THREE.Mesh | null)[]>([]);
 
   return (
     <group>
@@ -219,10 +215,9 @@ export function AsteroidBelt({
         };
 
         return (
-          <group key={ast.id} position={[ast.x, ast.y, ast.z]}>
+          <group key={ast.id} position={[ast.x, ast.y, ast.z]} ref={(el) => { groupRefs.current[index] = el; }}>
             {/* Base Basalt Rocky Mesh */}
             <mesh
-              ref={(el) => { meshesRefs.current[index] = el; }}
               geometry={geo}
               onPointerOver={handlePointerOver}
               onPointerOut={handlePointerOut}
