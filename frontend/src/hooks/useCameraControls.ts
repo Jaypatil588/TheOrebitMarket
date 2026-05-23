@@ -10,14 +10,14 @@ interface AsteroidPosition {
 
 export function useCameraControls(selectedAsteroid: AsteroidPosition | null) {
   const { camera } = useThree();
+
+  // Camera defaults for Earth in the top-left quadrant — camera at [0, 6, 14], looking at [0, 0, 0]
+  const originalPosition = useRef(new THREE.Vector3(0, 6, 14));
+  const targetPosition = useRef(new THREE.Vector3(0, 6, 14));
   
-  // Camera defaults for Earth position — offset by [-6, 4, 5]
-  const originalPosition = useRef(new THREE.Vector3(-6, 10, 19));
-  const targetPosition = useRef(new THREE.Vector3(-6, 10, 19));
-  
-  // Look at the center of the scene (Earth)
-  const lookAtTarget = useRef(new THREE.Vector3(-6, 4, 5));
-  const targetLookAt = useRef(new THREE.Vector3(-6, 4, 5));
+  // Look at the center of the scene (origin)
+  const lookAtTarget = useRef(new THREE.Vector3(0, 0, 0));
+  const targetLookAt = useRef(new THREE.Vector3(0, 0, 0));
 
   // Handle selected asteroid changes
   useEffect(() => {
@@ -37,7 +37,7 @@ export function useCameraControls(selectedAsteroid: AsteroidPosition | null) {
     } else {
       // Return to global view
       targetPosition.current.copy(originalPosition.current);
-      targetLookAt.current.set(-6, 4, 5);
+      targetLookAt.current.set(0, 0, 0);
     }
   }, [selectedAsteroid]);
 
@@ -45,16 +45,16 @@ export function useCameraControls(selectedAsteroid: AsteroidPosition | null) {
   useFrame((state, delta) => {
     const speed = 3.2;
     const t = Math.min(delta * speed, 1);
-    
+
     // Smooth position transition
     camera.position.lerp(targetPosition.current, t);
 
     // Smooth lookAt target transition
     lookAtTarget.current.lerp(targetLookAt.current, t);
-    
+
     // Rotate camera to face target
     camera.lookAt(lookAtTarget.current);
-    
+
     // Subtle float drift when no asteroid selected
     if (!selectedAsteroid) {
       const time = state.clock.getElapsedTime();
