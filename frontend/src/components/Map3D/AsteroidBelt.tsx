@@ -159,11 +159,17 @@ export function AsteroidBelt({
     }
 
     asteroids.forEach((ast, index) => {
-      const nextAngle = anglesRef.current[index] + ast.orbitSpeed * delta;
-      anglesRef.current[index] = nextAngle;
-
       const currentRadius = radii[ast.ringIndex];
       if (currentRadius === undefined) return;
+
+      // Keplerian speed scaling: inner orbits are much faster.
+      // Proximity goes from 1.0 (radius 6.0) to 0.0 (radius 18.25)
+      const proximity = Math.max(0, Math.min(1, (18.25 - currentRadius) / (18.25 - 6.0)));
+      // Boost inner asteroid speed by up to 3.5x
+      const speedMultiplier = 1.0 + Math.pow(proximity, 1.5) * 2.5;
+
+      const nextAngle = anglesRef.current[index] + ast.orbitSpeed * speedMultiplier * delta;
+      anglesRef.current[index] = nextAngle;
 
       const nextX = CENTER_X + Math.cos(nextAngle) * currentRadius;
       const nextZ = CENTER_Z + Math.sin(nextAngle) * currentRadius;
@@ -222,9 +228,23 @@ export function AsteroidBelt({
           }
         }
 
+        // Dynamically boost material color brightness for asteroids closer to Earth
+        // (simulates Earth-shine and stronger primary illumination reflections)
+        const currentRadius = radii[ast.ringIndex] || 6.0;
+        const colorProximity = Math.max(0, Math.min(1, (18.25 - currentRadius) / (18.25 - 6.0)));
+        const finalColor = new THREE.Color(rockColor);
+        if (!isSelected && !isHovered) {
+          // Increase lightness of channels up to 0.25 (25% boost) for inner rings
+          const colorBoost = colorProximity * 0.25;
+          finalColor.r = Math.min(1, finalColor.r + colorBoost);
+          finalColor.g = Math.min(1, finalColor.g + colorBoost);
+          finalColor.b = Math.min(1, finalColor.b + colorBoost);
+        }
+
         return (
           <group
             key={ast.id}
+            name={`asteroid-${ast.id}`}
             position={[ast.x, ast.y, ast.z]}
             ref={(el) => {
               groupRefs.current[index] = el;
@@ -241,7 +261,7 @@ export function AsteroidBelt({
             >
               <meshStandardMaterial
                 map={colorMap}
-                color={rockColor}
+                color={finalColor}
                 roughness={0.88}
                 metalness={spec === "M" ? 0.25 : 0.08}
                 normalMap={normalMap}
