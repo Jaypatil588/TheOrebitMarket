@@ -29,17 +29,22 @@ export function useCameraControls(selectedAsteroid: AsteroidPosition | null) {
       // Find the object ONCE when selection changes and cache it
       liveTargetRef.current = scene.getObjectByName(`asteroid-${selectedAsteroid.id}`) || null;
 
-      // Set initial focus coordinate (will be tracked dynamically in useFrame)
-      targetPosition.current.set(
-        selectedAsteroid.x + 0.6,
-        selectedAsteroid.y + 0.4,
-        selectedAsteroid.z + 1.3
-      );
-      targetLookAt.current.set(
-        selectedAsteroid.x,
-        selectedAsteroid.y,
-        selectedAsteroid.z
-      );
+      // Earth position matching EarthSystem.tsx
+      const earthPos = new THREE.Vector3(-6, 4, 5);
+      const asteroidPos = new THREE.Vector3(selectedAsteroid.x, selectedAsteroid.y, selectedAsteroid.z);
+      const dir = new THREE.Vector3().subVectors(asteroidPos, earthPos).normalize();
+      
+      const zoomDistance = 1.5;
+      const yOffset = 0.25;
+
+      // Calculate initial target position along the line from Earth through asteroid
+      const targetPos = new THREE.Vector3()
+        .copy(asteroidPos)
+        .addScaledVector(dir, zoomDistance);
+      targetPos.y += yOffset;
+
+      targetPosition.current.copy(targetPos);
+      targetLookAt.current.copy(asteroidPos);
     } else {
       liveTargetRef.current = null;
       // Return to global view
@@ -57,12 +62,20 @@ export function useCameraControls(selectedAsteroid: AsteroidPosition | null) {
       const livePos = new THREE.Vector3();
       liveTargetRef.current.getWorldPosition(livePos);
 
+      // Earth position matching EarthSystem.tsx
+      const earthPos = new THREE.Vector3(-6, 4, 5);
+      const dir = new THREE.Vector3().subVectors(livePos, earthPos).normalize();
+
+      const zoomDistance = 1.5;
+      const yOffset = 0.25;
+
+      const targetPos = new THREE.Vector3()
+        .copy(livePos)
+        .addScaledVector(dir, zoomDistance);
+      targetPos.y += yOffset;
+
       // Update target positions to track the moving asteroid
-      targetPosition.current.set(
-        livePos.x + 0.6,
-        livePos.y + 0.4,
-        livePos.z + 1.3
-      );
+      targetPosition.current.copy(targetPos);
       targetLookAt.current.copy(livePos);
     }
 
