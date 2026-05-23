@@ -37,15 +37,15 @@ export function EarthSystem() {
   // Rotate Earth — slow cinematic rotation
   useFrame(() => {
     if (earthRef.current) {
-      earthRef.current.rotation.y += 0.0002;
+      earthRef.current.rotation.y += 0.0001;
     }
     if (glowRef.current) {
-      glowRef.current.rotation.y += 0.0002;
+      glowRef.current.rotation.y += 0.0001;
     }
   });
 
   // Earth centered at origin for hero section
-  const earthCenter: [number, number, number] = [0, 0, 0];
+  const earthCenter: [number, number, number] = [-6, 4, 5];
 
   return (
     <group position={earthCenter} rotation={[0, 0, -23.4 * Math.PI / 180]}>
