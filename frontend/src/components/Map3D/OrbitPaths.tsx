@@ -13,9 +13,9 @@ export function OrbitPaths({
   selectedRingIndex,
 }: OrbitPathsProps) {
   // Center of orbits — aligned with centered Earth
-  const centerX = 0;
-  const centerY = 0;
-  const centerZ = 0;
+  const centerX = -6;
+  const centerY = 4;
+  const centerZ = 5;
 
   // Pre-calculate line loops for each radius
   const orbits = useMemo(() => {
