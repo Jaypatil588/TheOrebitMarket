@@ -29,6 +29,10 @@ yarn-error.log*
 *.env
 **/.env*
 
+# Large asteroid datasets — stored in PostgreSQL, too big for git
+backend/data/all_asteroids_processed.json
+backend/data/all_asteroids_raw.json
+
 # OS Files
 .DS_Store
 Thumbs.db
