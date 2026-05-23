@@ -87,63 +87,46 @@ export function AsteroidDetail({ selectedAsteroid, onClose }: AsteroidDetailProp
                 Mineral Composition
               </span>
 
-              {/* Basalt */}
-              <div className="space-y-1">
-                <div className="flex justify-between text-[10px]">
-                  <span className="text-slate-400">Basalt Rock</span>
-                  <span className="text-slate-200">{selectedAsteroid.composition.basalt}%</span>
-                </div>
-                <div className="h-1.5 w-full bg-slate-900 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-slate-500 rounded-full transition-all duration-500"
-                    style={{ width: `${selectedAsteroid.composition.basalt}%` }}
-                  />
-                </div>
-              </div>
+              {Object.entries(selectedAsteroid.composition).map(([mineral, percentage]) => {
+                // Map keys to readable titles (e.g. platinumGroup -> Platinum Group, waterIce -> Water Ice)
+                const label = mineral
+                  .replace(/([A-Z])/g, " $1")
+                  .replace(/^./, (str) => str.toUpperCase());
 
-              {/* Magnetite */}
-              <div className="space-y-1">
-                <div className="flex justify-between text-[10px]">
-                  <span className="text-slate-400">Magnetite</span>
-                  <span className="text-slate-200">{selectedAsteroid.composition.magnetite}%</span>
-                </div>
-                <div className="h-1.5 w-full bg-slate-900 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-amber-600 rounded-full transition-all duration-500"
-                    style={{ width: `${selectedAsteroid.composition.magnetite}%` }}
-                  />
-                </div>
-              </div>
+                // Assign progress bar colors dynamically
+                let barColor = "bg-slate-500"; // default stony matrix / clay minerals
+                let isPrecious = false;
 
-              {/* Platinum Group */}
-              <div className="space-y-1">
-                <div className="flex justify-between text-[10px]">
-                  <span className="text-slate-400">Platinum Group</span>
-                  <span className="text-amber-400 font-bold">
-                    {selectedAsteroid.composition.platinumGroup}%
-                  </span>
-                </div>
-                <div className="h-1.5 w-full bg-slate-900 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-amber-500 rounded-full transition-all duration-500"
-                    style={{ width: `${selectedAsteroid.composition.platinumGroup}%` }}
-                  />
-                </div>
-              </div>
+                if (mineral.toLowerCase().includes("platinum") || mineral.toLowerCase().includes("gold")) {
+                  barColor = "bg-amber-500";
+                  isPrecious = true;
+                } else if (mineral.toLowerCase().includes("water") || mineral.toLowerCase().includes("ice")) {
+                  barColor = "bg-blue-500";
+                } else if (mineral.toLowerCase().includes("iron") || mineral.toLowerCase().includes("nickel") || mineral.toLowerCase().includes("cobalt")) {
+                  barColor = "bg-amber-600";
+                } else if (mineral.toLowerCase().includes("silicon") || mineral.toLowerCase().includes("magnesium") || mineral.toLowerCase().includes("silicates")) {
+                  barColor = "bg-slate-700";
+                } else if (mineral.toLowerCase().includes("carbon")) {
+                  barColor = "bg-slate-400";
+                }
 
-              {/* Silicates */}
-              <div className="space-y-1">
-                <div className="flex justify-between text-[10px]">
-                  <span className="text-slate-400">Silicates</span>
-                  <span className="text-slate-200">{selectedAsteroid.composition.silicates}%</span>
-                </div>
-                <div className="h-1.5 w-full bg-slate-900 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-slate-700 rounded-full transition-all duration-500"
-                    style={{ width: `${selectedAsteroid.composition.silicates}%` }}
-                  />
-                </div>
-              </div>
+                return (
+                  <div key={mineral} className="space-y-1">
+                    <div className="flex justify-between text-[10px]">
+                      <span className="text-slate-400">{label}</span>
+                      <span className={isPrecious ? "text-amber-400 font-bold animate-pulse" : "text-slate-200"}>
+                        {percentage}%
+                      </span>
+                    </div>
+                    <div className="h-1.5 w-full bg-slate-900 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full ${barColor} rounded-full transition-all duration-500`}
+                        style={{ width: `${percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 

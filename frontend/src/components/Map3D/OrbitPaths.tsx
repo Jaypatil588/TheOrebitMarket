@@ -8,7 +8,7 @@ interface OrbitPathsProps {
 }
 
 export function OrbitPaths({
-  radii = [5.6, 6.1, 6.6, 7.1, 7.6],
+  radii = [],
   hoveredRingIndex,
   selectedRingIndex,
 }: OrbitPathsProps) {

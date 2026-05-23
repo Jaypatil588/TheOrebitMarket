@@ -27,35 +27,21 @@ function SceneContent({
   // Execute smooth camera transitions & drift updates
   useCameraControls(selectedAsteroid);
 
-  // Generate standard 800-particle starry vector field
-  const starsGeometry = useMemo(() => {
-    const coords: number[] = [];
-    const count = 1200;
-    for (let i = 0; i < count; i++) {
-      const radius = 30 + Math.random() * 40;
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos(Math.random() * 2 - 1);
-
-      const x = radius * Math.sin(phi) * Math.cos(theta);
-      const y = radius * Math.sin(phi) * Math.sin(theta);
-      const z = radius * Math.cos(phi);
-      coords.push(x, y, z);
+  const orbitRadii = useMemo(() => {
+    const arr = [];
+    for (let i = 0; i < 50; i++) {
+      arr.push(6.0 + i * 0.25);
     }
-
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute("position", new THREE.Float32BufferAttribute(coords, 3));
-    return geo;
+    return arr;
   }, []);
-
-  const orbitRadii = [5.6, 6.1, 6.6, 7.1, 7.6];
   const selectedRingIndex = selectedAsteroid !== null ? selectedAsteroid.ringIndex : null;
 
   return (
     <>
-      {/* Cinematic ambient space shading */}
-      <ambientLight intensity={0.06} />
+      {/* Cinematic ambient space shading for base illumination on all sides */}
+      <ambientLight intensity={0.45} />
 
-      {/* Bobby's exact sunlight: position=sunDirection, intensity=4.0 */}
+      {/* Primary strong sunlight pointing from top-left-front */}
       <directionalLight
         position={[-2, 0.5, 1.5]}
         intensity={4.0}
@@ -63,17 +49,11 @@ function SceneContent({
         shadow-mapSize={[1024, 1024]}
       />
 
-      {/* Dim space starfield */}
-      <points geometry={starsGeometry}>
-        <pointsMaterial
-          color="#ffffff"
-          size={0.03}
-          sizeAttenuation={true}
-          transparent={true}
-          opacity={0.18}
-          depthWrite={false}
-        />
-      </points>
+      {/* Secondary fill light pointing from the opposite side (bottom-right-back) */}
+      <directionalLight
+        position={[2, -0.5, -1.5]}
+        intensity={1.5}
+      />
 
       {/* Realistic Concentric Earth Globe System */}
       <EarthSystem />
