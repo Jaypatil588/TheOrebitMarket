@@ -110,7 +110,7 @@ export default function OrbitScene({
       <Canvas
         shadows
         camera={{
-          position: [0, 6, 14],
+          position: [-6, 10, 19],
           fov: 55,
           near: 0.1,
           far: 100,
