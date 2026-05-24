@@ -3,7 +3,6 @@ import { Line } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import type { MissionRoute } from "@/types/orebit";
-import { MOCK_ROUTE } from "@/lib/mockRoutes";
 import { applyMockRouteCameraFacingAngle } from "@/lib/mockRoutePlacement";
 
 const ROUTE_YELLOW = "#facc15";
@@ -167,8 +166,8 @@ export function RouteLines({
   }, [mockRoutePlacement]);
 
   const defaultRoute = useMemo(() => {
-    const list = routes && routes.length > 0 ? routes : [MOCK_ROUTE];
-    return list.find((r) => r.is_default) ?? list[0] ?? MOCK_ROUTE;
+    if (!routes || routes.length === 0) return null;
+    return routes.find((r) => r.is_default) ?? routes[0] ?? null;
   }, [routes]);
 
   const selectedPoints = useMemo(() => {
@@ -181,7 +180,7 @@ export function RouteLines({
     return [earthSurfaceToward(target), target];
   }, [selectedAsteroid]);
 
-  const routeColor = defaultRoute.color_hex || ROUTE_YELLOW;
+  const routeColor = defaultRoute?.color_hex ?? ROUTE_YELLOW;
 
   const selectedLinePoints = useMemo(
     () => selectedPoints.map((p) => [p.x, p.y, p.z] as [number, number, number]),
@@ -190,7 +189,7 @@ export function RouteLines({
 
   return (
     <group>
-      {asteroidPositions.size > 0 && (
+      {defaultRoute && asteroidPositions.size > 0 && (
         <LiveRouteLine route={defaultRoute} posMap={asteroidPositions} color={routeColor} />
       )}
       {selectedLinePoints.length >= 2 && (

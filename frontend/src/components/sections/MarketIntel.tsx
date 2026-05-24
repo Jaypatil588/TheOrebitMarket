@@ -15,16 +15,6 @@ interface MarketIntelProps {
   onScenarioRemoved?: (id: string) => void;
 }
 
-// Mock fallback data shown before live data arrives
-const MOCK_PRICES: MarketPrice[] = [
-  { mineral: "platinum", price_usd: 31240, trend: "rising", change_pct: 2.1, urgency: 0.51, disruption: "", source_url: "", category: "pgm", criticality: 1, scenario_adjusted: false, fetched_at: "" },
-  { mineral: "cobalt", price_usd: 33800, trend: "falling", change_pct: -0.4, urgency: 0.82, disruption: "DRC flooding", source_url: "", category: "battery", criticality: 1, scenario_adjusted: false, fetched_at: "" },
-  { mineral: "nickel", price_usd: 16420, trend: "rising", change_pct: 0.8, urgency: 0.45, disruption: "", source_url: "", category: "battery", criticality: 1, scenario_adjusted: false, fetched_at: "" },
-  { mineral: "neodymium", price_usd: 210, trend: "rising", change_pct: 1.8, urgency: 0.74, disruption: "China export restrictions", source_url: "", category: "rare_earth", criticality: 1, scenario_adjusted: false, fetched_at: "" },
-  { mineral: "lithium", price_usd: 12.8, trend: "falling", change_pct: -1.2, urgency: 0.43, disruption: "", source_url: "", category: "battery", criticality: 2, scenario_adjusted: false, fetched_at: "" },
-  { mineral: "iron", price_usd: 0.124, trend: "stable", change_pct: 0.1, urgency: 0.12, disruption: "", source_url: "", category: "industrial", criticality: 3, scenario_adjusted: false, fetched_at: "" },
-];
-
 const DISPLAY_SYMBOLS: Record<string, string> = {
   platinum: "Pt", cobalt: "Co", nickel: "Ni", neodymium: "Nd",
   lithium: "Li", iron: "Fe", palladium: "Pd", rhodium: "Rh",
@@ -85,10 +75,9 @@ export function MarketIntel({
   const sectionRef = useRef<HTMLDivElement>(null);
   const isInView = useInView(sectionRef, { once: true, margin: "-100px" });
 
-  const isLive = hasLivePrices;
-  const activePrices = isLive && prices && prices.length > 0 ? prices : MOCK_PRICES;
+  const isLive = hasLivePrices && Boolean(prices && prices.length > 0);
+  const activePrices = isLive ? prices! : [];
 
-  // Show top 6 by urgency for the grid cards
   const displayPrices = [...activePrices]
     .sort((a, b) => b.urgency - a.urgency)
     .slice(0, 6);
@@ -121,9 +110,15 @@ export function MarketIntel({
               THE MARKETS
             </h2>
             <span className="flex items-center gap-1.5 text-xs font-mono uppercase tracking-wider px-2 py-1 rounded"
-              style={{ background: isLive ? "rgba(52,211,153,0.1)" : "rgba(251,191,36,0.1)", color: isLive ? "var(--positive)" : "var(--warning)" }}>
-              <div className={`w-1.5 h-1.5 rounded-full ${isLive ? "pulse-active" : ""}`} style={{ background: isLive ? "var(--positive)" : "var(--warning)" }} />
-              {isLive ? "LIVE" : "AWAITING DATA"}
+              style={{
+                background: isLive ? "rgba(52,211,153,0.1)" : "rgba(148,163,184,0.08)",
+                color: isLive ? "var(--positive)" : "var(--dust-dim)",
+              }}>
+              <div
+                className={`w-1.5 h-1.5 rounded-full ${isLive ? "pulse-active" : ""}`}
+                style={{ background: isLive ? "var(--positive)" : "var(--dust-dim)" }}
+              />
+              {isLive ? "LIVE" : "SYNCING"}
             </span>
           </div>
           <p className="text-base" style={{ color: "var(--dust)" }}>
@@ -132,6 +127,13 @@ export function MarketIntel({
         </motion.div>
 
         {/* Commodity Cards Grid */}
+        {displayPrices.length === 0 ? (
+          <div className="glass-card p-8 mb-8 text-center">
+            <p className="text-sm font-mono" style={{ color: "var(--dust-dim)" }}>
+              Waiting for live commodity feeds from Market Intelligence agent…
+            </p>
+          </div>
+        ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-8">
           {displayPrices.map((p, i) => (
             <motion.div
@@ -187,6 +189,7 @@ export function MarketIntel({
             </motion.div>
           ))}
         </div>
+        )}
 
         {/* Supply Chain Alerts */}
         {alerts.length > 0 && (
@@ -264,8 +267,8 @@ export function MarketIntel({
           style={{ color: "var(--dust-dim)" }}
         >
           {isLive
-            ? `Live data — ${activePrices.length} minerals tracked · Refreshes every 10s via Agent 2`
-            : "Simulated commodity preview — awaiting Agent 2 market feed"}
+            ? `Live commodity intelligence — ${activePrices.length} minerals tracked · Refreshes every 10s via Agent 2`
+            : "Commodity prices load from API/WebSocket when Agent 2 completes a market pass"}
         </motion.p>
       </div>
     </section>

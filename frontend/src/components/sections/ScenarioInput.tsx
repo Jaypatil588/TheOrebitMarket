@@ -15,13 +15,6 @@ interface ScenarioInputProps {
 
 const PRESETS = [
   {
-    label: "China blocks rare earths",
-    description: "China blocks all rare earth mineral exports",
-    affected_minerals: ["neodymium", "dysprosium", "terbium", "cerium", "praseodymium", "lanthanum", "europium", "gadolinium", "yttrium"],
-    severity: 0.95,
-    color: "#f59e0b",
-  },
-  {
     label: "DRC cobalt flooding",
     description: "DRC cobalt mine flooding — 3 mines offline",
     affected_minerals: ["cobalt"],
@@ -53,7 +46,7 @@ export function ScenarioInput({ activeScenarios, onScenarioInjected, onScenarioR
 
   async function injectScenario(desc: string, minerals: string[], sev: number) {
     if (desc === DEMO_SCENARIO_PHRASE) {
-      setError("Use Market Feed Input (Agent 2) for the phrase demo — it stays in-browser only.");
+      setError("Enter this scenario in the Market Feed input below (Agent 2).");
       return;
     }
     setSubmitting(true);
@@ -114,7 +107,7 @@ export function ScenarioInput({ activeScenarios, onScenarioInjected, onScenarioR
           Scenario Injection
         </h3>
         <span className="text-xs px-1.5 py-0.5 rounded font-mono" style={{ background: "rgba(251,191,36,0.1)", color: "var(--warning)" }}>
-          LIVE CASCADE
+          LIVE
         </span>
       </div>
 

@@ -35,7 +35,7 @@ export function isMockRouteOnly(routes?: MissionRoute[]): boolean {
   return !hasLiveRoutes(routes);
 }
 
-/** Map/3D preview routes — demo override when phrase triggered; mock only if backend has none. */
+/** Map/3D preview routes — demo override when phrase triggered; live routes only otherwise. */
 export function getDisplayRoutes(
   routes?: MissionRoute[],
   options?: { demoActive?: boolean }
@@ -44,14 +44,12 @@ export function getDisplayRoutes(
   if (options?.demoActive) {
     return [{ ...DEMO_ROUTE, is_default: true }, ...live];
   }
-  if (live.length > 0) return live;
-  return [MOCK_ROUTE];
+  return live;
 }
 
-/** Camera-facing placement for mock or demo routes on the 3D belt */
-export function needsRoutePlacement(routes?: MissionRoute[], demoActive?: boolean): boolean {
-  if (demoActive) return true;
-  return isMockRouteOnly(routes);
+/** Camera-facing placement for demo route stops on the 3D belt */
+export function needsRoutePlacement(_routes?: MissionRoute[], demoActive?: boolean): boolean {
+  return demoActive === true;
 }
 
 export function applyMockRouteCameraFacingAngle<T extends { id: string; angle: number }>(

@@ -55,7 +55,7 @@ export function DemoScenarioInput({ onTrigger, triggered = false }: DemoScenario
             if (e.key === "Enter") tryTrigger(value);
           }}
           disabled={triggered}
-          placeholder="write something here to change the markets"
+          placeholder="Enter market intelligence signal…"
           className="w-full bg-transparent text-sm font-mono text-white placeholder-slate-600 outline-none disabled:opacity-60"
         />
       </div>

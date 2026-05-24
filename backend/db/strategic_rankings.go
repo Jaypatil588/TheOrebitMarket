@@ -3,8 +3,11 @@ package db
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 // InsertStrategicRanking saves a new ranking run
@@ -50,6 +53,9 @@ func (s *Store) GetLatestStrategicRanking() (*StrategicRanking, error) {
 	var rankRaw, routesRaw, urgencyRaw []byte
 	err := row.Scan(&r.ID, &rankRaw, &routesRaw, &urgencyRaw, &r.GeneratedAt)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	json.Unmarshal(rankRaw, &r.Rankings)

@@ -11,6 +11,7 @@ type Hub struct {
 	broadcast  chan []byte
 	register   chan *Client
 	unregister chan *Client
+	onConnect  []func(*Client)
 	mu         sync.Mutex
 }
 
@@ -31,7 +32,13 @@ func (h *Hub) Run() {
 		case client := <-h.register:
 			h.mu.Lock()
 			h.clients[client] = true
+			callbacks := append([]func(*Client){}, h.onConnect...)
 			h.mu.Unlock()
+			for _, fn := range callbacks {
+				if fn != nil {
+					fn(client)
+				}
+			}
 		case client := <-h.unregister:
 			h.mu.Lock()
 			if _, ok := h.clients[client]; ok {
@@ -52,6 +59,16 @@ func (h *Hub) Run() {
 			h.mu.Unlock()
 		}
 	}
+}
+
+// OnClientConnect registers a callback invoked for each new WebSocket client.
+func (h *Hub) OnClientConnect(fn func(*Client)) {
+	if fn == nil {
+		return
+	}
+	h.mu.Lock()
+	h.onConnect = append(h.onConnect, fn)
+	h.mu.Unlock()
 }
 
 // BroadcastJSON handles JSON marshaling and publishes a struct to all clients

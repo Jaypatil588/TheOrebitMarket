@@ -18,6 +18,7 @@ interface StrategicRankingsProps {
   hasLiveRoutes?: boolean;
   demoActive?: boolean;
   onRouteClick?: (route: MissionRoute) => void;
+  onAsteroidClick?: (asteroid: RankedAsteroid) => void;
 }
 
 const TrendIcon = ({ trend }: { trend: string }) => {
@@ -34,18 +35,6 @@ function urgencyLabel(mineral: string, urgency: number, boosted: boolean): strin
   return `${mineral} — low`;
 }
 
-// Mock rankings — remove when WebSocket/REST rankings are live
-const MOCK_RANKINGS: RankedAsteroid[] = [
-  { rank: 1, asteroid_id: "16", name: "16 Psyche", spec_type: "M", composite_score: 0.94, net_value_usd: 1.02e13, roi: 2840, top_mineral: "iron", mineral_urgency: 0.82, delta_v_km_s: 5.82, launch_window_year: 2028, confidence: 0.91, scenario_boosted: false, reasoning: "", trend: "up" },
-  { rank: 2, asteroid_id: "25143", name: "25143 Itokawa", spec_type: "S", composite_score: 0.87, net_value_usd: 4.2e11, roi: 620, top_mineral: "platinum", mineral_urgency: 0.51, delta_v_km_s: 4.65, launch_window_year: 2029, confidence: 0.88, scenario_boosted: false, reasoning: "", trend: "up" },
-  { rank: 3, asteroid_id: "433", name: "433 Eros", spec_type: "S", composite_score: 0.83, net_value_usd: 2.8e11, roi: 410, top_mineral: "cobalt", mineral_urgency: 0.82, delta_v_km_s: 5.21, launch_window_year: 2028, confidence: 0.85, scenario_boosted: true, reasoning: "", trend: "up" },
-  { rank: 4, asteroid_id: "162173", name: "162173 Ryugu", spec_type: "C", composite_score: 0.79, net_value_usd: 1.9e11, roi: 380, top_mineral: "water_ice", mineral_urgency: 0.43, delta_v_km_s: 4.98, launch_window_year: 2030, confidence: 0.86, scenario_boosted: false, reasoning: "", trend: "flat" },
-  { rank: 5, asteroid_id: "101955", name: "101955 Bennu", spec_type: "B", composite_score: 0.76, net_value_usd: 1.4e11, roi: 290, top_mineral: "neodymium", mineral_urgency: 0.74, delta_v_km_s: 5.45, launch_window_year: 2029, confidence: 0.82, scenario_boosted: false, reasoning: "", trend: "up" },
-  { rank: 6, asteroid_id: "4", name: "4 Vesta", spec_type: "V", composite_score: 0.72, net_value_usd: 9.8e10, roi: 210, top_mineral: "nickel", mineral_urgency: 0.45, delta_v_km_s: 6.12, launch_window_year: 2031, confidence: 0.79, scenario_boosted: false, reasoning: "", trend: "flat" },
-  { rank: 7, asteroid_id: "1", name: "1 Ceres", spec_type: "C", composite_score: 0.68, net_value_usd: 7.2e10, roi: 165, top_mineral: "water_ice", mineral_urgency: 0.43, delta_v_km_s: 6.85, launch_window_year: 2032, confidence: 0.77, scenario_boosted: false, reasoning: "", trend: "down" },
-  { rank: 8, asteroid_id: "99942", name: "99942 Apophis", spec_type: "S", composite_score: 0.65, net_value_usd: 5.1e10, roi: 142, top_mineral: "cobalt", mineral_urgency: 0.82, delta_v_km_s: 5.88, launch_window_year: 2029, confidence: 0.74, scenario_boosted: false, reasoning: "", trend: "up" },
-];
-
 export function StrategicRankings({
   rankings,
   routes,
@@ -54,14 +43,18 @@ export function StrategicRankings({
   hasLiveRoutes: hasLiveRoutesProp = false,
   demoActive = false,
   onRouteClick,
+  onAsteroidClick,
 }: StrategicRankingsProps) {
   const sectionRef = useRef<HTMLDivElement>(null);
   const isInView = useInView(sectionRef, { once: true, margin: "-100px" });
 
-  const hasLiveRankings = hasLiveRankingsProp;
-  const liveRoutes = demoActive || hasLiveRoutesProp || hasLiveRoutes(routes);
-  const baseRankings = hasLiveRankings ? rankings! : MOCK_RANKINGS;
-  const displayRankings = demoActive ? applyDemoRankings(baseRankings) : baseRankings;
+  const hasLiveRankings = hasLiveRankingsProp && Boolean(rankings && rankings.length > 0);
+  const liveRoutes = hasLiveRoutesProp || hasLiveRoutes(routes) || demoActive;
+  const baseRankings = hasLiveRankings ? rankings! : [];
+  const displayRankings =
+    demoActive && baseRankings.length > 0
+      ? applyDemoRankings(baseRankings)
+      : baseRankings;
   const displayRoutes = displayRoutesProp ?? routes ?? [];
   const defaultRoute = displayRoutes.find((r) => r.is_default) ?? displayRoutes[0];
 
@@ -86,25 +79,17 @@ export function StrategicRankings({
             >
               THE TARGETS
             </h2>
-            {hasLiveRankings ? (
-              <span className="flex items-center gap-1.5 text-xs font-mono uppercase tracking-wider px-2 py-1 rounded"
-                style={{ background: "rgba(52,211,153,0.1)", color: "var(--positive)" }}>
-                <div className="w-1.5 h-1.5 rounded-full pulse-active" style={{ background: "var(--positive)" }} />
-                LIVE
-              </span>
-            ) : (
-              <span className="flex items-center gap-1.5 text-xs font-mono uppercase tracking-wider px-2 py-1 rounded"
-                style={{ background: "rgba(251,191,36,0.1)", color: "var(--warning)" }}>
-                <div className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--warning)" }} />
-                AWAITING DATA
-              </span>
-            )}
-            {!liveRoutes && (
-              <span className="text-xs font-mono uppercase tracking-wider px-2 py-1 rounded"
-                style={{ background: "rgba(148,163,184,0.12)", color: "var(--dust-dim)" }}>
-                ROUTE PREVIEW
-              </span>
-            )}
+            <span className="flex items-center gap-1.5 text-xs font-mono uppercase tracking-wider px-2 py-1 rounded"
+              style={{
+                background: hasLiveRankings ? "rgba(52,211,153,0.1)" : "rgba(148,163,184,0.08)",
+                color: hasLiveRankings ? "var(--positive)" : "var(--dust-dim)",
+              }}>
+              <div
+                className={`w-1.5 h-1.5 rounded-full ${hasLiveRankings ? "pulse-active" : ""}`}
+                style={{ background: hasLiveRankings ? "var(--positive)" : "var(--dust-dim)" }}
+              />
+              {hasLiveRankings ? "LIVE" : "SYNCING"}
+            </span>
           </div>
           <p className="text-base" style={{ color: "var(--dust)" }}>
             Strategic asteroid rankings — live-ranked by AI agents based on value, accessibility, and market conditions
@@ -123,7 +108,7 @@ export function StrategicRankings({
           >
             <div className="w-2 h-2 rounded-full" style={{ background: defaultRoute.color_hex }} />
             <span className="text-sm font-mono" style={{ color: defaultRoute.color_hex }}>
-              {liveRoutes ? "Active Route" : "Preview Route"}: {defaultRoute.label}
+              Active Route: {defaultRoute.label}
             </span>
             <span className="text-xs ml-auto" style={{ color: "var(--dust-dim)" }}>
               {defaultRoute.stops.length - 2} stops · Δv {defaultRoute.totals.total_delta_v_km_s?.toFixed(1)} km/s · {defaultRoute.urgency_reason}
@@ -132,6 +117,13 @@ export function StrategicRankings({
         )}
 
         {/* Rankings Table */}
+        {displayRankings.length === 0 ? (
+          <div className="glass-card p-8 text-center">
+            <p className="text-sm font-mono" style={{ color: "var(--dust-dim)" }}>
+              Waiting for strategic rankings from Agent 3…
+            </p>
+          </div>
+        ) : (
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
@@ -158,8 +150,17 @@ export function StrategicRankings({
                   initial={{ opacity: 0, x: -20 }}
                   animate={isInView ? { opacity: 1, x: 0 } : {}}
                   transition={{ duration: 0.4, delay: 0.3 + i * 0.06 }}
-                  className="group"
+                  className="group cursor-pointer hover:bg-white/[0.03] transition-colors"
                   style={ast.scenario_boosted ? { background: "rgba(251,191,36,0.03)" } : {}}
+                  onClick={() => onAsteroidClick?.(ast)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onAsteroidClick?.(ast);
+                    }
+                  }}
                 >
                   <td>
                     <span className="text-sm font-medium" style={{ color: "var(--dust-dim)" }}>
@@ -230,6 +231,7 @@ export function StrategicRankings({
             </tbody>
           </table>
         </motion.div>
+        )}
 
         {/* Route summary strip */}
         {displayRoutes.length > 0 && (
@@ -265,13 +267,9 @@ export function StrategicRankings({
           className="mt-6 text-sm tracking-wide"
           style={{ color: "var(--dust-dim)" }}
         >
-          {hasLiveRankings && liveRoutes
-            ? `Live rankings and routes from Strategic Ranker · ${displayRankings.length} targets · ${displayRoutes.length} routes`
-            : hasLiveRankings
-              ? `Live rankings · ${displayRankings.length} targets — mission routes still computing (Agent 3)`
-              : liveRoutes
-                ? `${displayRoutes.length} routes ready — rankings pending Agent 3`
-                : `Demo table until Agent 3 finishes · map shows route preview until live routes arrive`}
+          {hasLiveRankings
+            ? `Strategic Ranker · ${displayRankings.length} targets · ${displayRoutes.length} mission routes · updated in real time`
+            : "Rankings load from API/WebSocket when Agent 3 completes a ranking pass"}
         </motion.p>
       </div>
     </section>

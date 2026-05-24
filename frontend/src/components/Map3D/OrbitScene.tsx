@@ -10,7 +10,6 @@ import { RouteLines } from "./RouteLines";
 import { useCameraControls } from "@/hooks/useCameraControls";
 import { MissionRoute } from "@/hooks/useWebSockets";
 import { getRouteAsteroidIds, needsRoutePlacement } from "@/lib/mockRoutePlacement";
-import { MOCK_ROUTE } from "@/lib/mockRoutes";
 
 // ─── Toggle to true to render the shadow camera frustum wireframe in the browser ───
 const DEBUG_SHADOW_CAMERA = false;
@@ -92,17 +91,17 @@ function SceneContent({
   const mockRoutePlacement = needsRoutePlacement(routes, demoActive);
 
   const defaultRoute = useMemo(() => {
-    const list = routes && routes.length > 0 ? routes : [MOCK_ROUTE];
-    return list.find((r) => r.is_default) ?? list[0] ?? MOCK_ROUTE;
+    if (!routes || routes.length === 0) return null;
+    return routes.find((r) => r.is_default) ?? routes[0] ?? null;
   }, [routes]);
 
   useCameraControls(selectedAsteroid);
 
   const routedAsteroidIds = useMemo(
-    () => getRouteAsteroidIds(defaultRoute),
+    () => (defaultRoute ? getRouteAsteroidIds(defaultRoute) : []),
     [defaultRoute]
   );
-  const routeColor = defaultRoute.color_hex || "#22d3ee";
+  const routeColor = defaultRoute?.color_hex ?? "#22d3ee";
 
   return (
     <>

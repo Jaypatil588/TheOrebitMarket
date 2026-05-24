@@ -9,8 +9,14 @@ import { MarketIntel } from "@/components/sections/MarketIntel";
 import { AsteroidDetail } from "@/components/HUD/AsteroidDetail";
 import { RouteDetailPopup } from "@/components/HUD/RouteDetailPopup";
 import { AsteroidData } from "@/components/Map3D/AsteroidBelt";
-import { useOrebitWebSocket, Scenario, MissionRoute } from "@/hooks/useWebSockets";
+import { useOrebitWebSocket, Scenario, MissionRoute, RankedAsteroid } from "@/hooks/useWebSockets";
 import { getDisplayRoutes } from "@/lib/mockRoutePlacement";
+import { rankedToAsteroidData } from "@/lib/asteroidSelection";
+import {
+  buildPrecompiledMissionReport,
+  isFirstRankingRow,
+} from "@/lib/precompiledReports";
+import type { MissionReportData } from "@/types/orebit";
 import {
   DEMO_SCENARIO,
   buildDemoPriceFeed,
@@ -28,12 +34,14 @@ export default function Home() {
   const [hoveredRingIndex, setHoveredRingIndex] = useState<number | null>(null);
   const [activeScenarios, setActiveScenarios] = useState<Scenario[]>([]);
   const [demoActive, setDemoActive] = useState(false);
+  const [clientMissionReport, setClientMissionReport] = useState<MissionReportData | null>(null);
 
   const {
     marketPrices,
     rankings,
     routes,
     agentStatuses,
+    missionReport,
     hasLivePrices,
     hasLiveRankings,
     hasLiveRoutes,
@@ -43,6 +51,33 @@ export default function Home() {
     () => getDisplayRoutes(routes, { demoActive }),
     [routes, demoActive]
   );
+  const defaultRoute = useMemo(
+    () => displayRoutes.find((r) => r.is_default) ?? displayRoutes[0] ?? null,
+    [displayRoutes]
+  );
+
+  const handleRankingAsteroidClick = useCallback(
+    (rank: RankedAsteroid) => {
+      setSelectedRoute(null);
+      if (isFirstRankingRow(rank)) {
+        setClientMissionReport(buildPrecompiledMissionReport(rank));
+      } else {
+        setClientMissionReport(null);
+      }
+      setSelectedAsteroid(rankedToAsteroidData(rank));
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    },
+    []
+  );
+
+  const displayMissionReport =
+    clientMissionReport?.asteroid_id === selectedAsteroid?.id
+      ? clientMissionReport
+      : missionReport;
+
+  const usePrecompiledReport =
+    clientMissionReport?.asteroid_id === selectedAsteroid?.id &&
+    Boolean(clientMissionReport?.report?.precompiled);
   const displayPrices = useMemo(
     () => (demoActive ? buildDemoPriceFeed(marketPrices) : marketPrices),
     [demoActive, marketPrices]
@@ -124,7 +159,13 @@ export default function Home() {
         <HeroOverlay />
         <AsteroidDetail
           selectedAsteroid={selectedAsteroid}
-          onClose={() => setSelectedAsteroid(null)}
+          routeId={usePrecompiledReport ? undefined : defaultRoute?.id}
+          missionReport={displayMissionReport}
+          precompiledReport={usePrecompiledReport}
+          onClose={() => {
+            setSelectedAsteroid(null);
+            setClientMissionReport(null);
+          }}
         />
       </section>
 
@@ -137,6 +178,7 @@ export default function Home() {
         hasLiveRankings={hasLiveRankings}
         hasLiveRoutes={hasLiveRoutes}
         onRouteClick={setSelectedRoute}
+        onAsteroidClick={handleRankingAsteroidClick}
       />
       <AgentActivity
         agentStatuses={agentStatuses}
@@ -145,7 +187,7 @@ export default function Home() {
       />
       <MarketIntel
         prices={displayPrices}
-        hasLivePrices={hasLivePrices}
+        hasLivePrices={hasLivePrices || (demoActive && displayPrices.length > 0)}
         activeScenarios={displayScenarios}
         onScenarioInjected={(sc) => {
           if (isEphemeralDemoScenario(sc.id)) return;

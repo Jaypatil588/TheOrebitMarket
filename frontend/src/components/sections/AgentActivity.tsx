@@ -76,7 +76,7 @@ function AgentCard({ icon, name, role, status, entries, accentColor, delay, isIn
         {entries.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full opacity-40">
             <span className="text-xs font-mono" style={{ color: "var(--dust-dim)" }}>
-              Awaiting agent logs...
+              Syncing agent telemetry…
             </span>
           </div>
         ) : (
@@ -108,41 +108,6 @@ const AGENT_DEFS = [
   { key: "valuation",     icon: <Telescope size={16} />, name: "Valuation Scout",      role: "NEA Research Analyst",   accentColor: "#a78bfa" },
   { key: "mission_report",icon: <Rocket size={16} />,    name: "Mission Architect",   role: "Mission Design Engineer", accentColor: "#f97316" },
 ];
-
-// Mock agent logs — remove when WebSocket agent_status streams are live
-const MOCK_AGENT_ENTRIES: Record<string, AgentEntry[]> = {
-  market_feed: [
-    { id: "mock-mf-1", message: "Scraping LME cobalt futures — spot $33,800/t (+2.1% weekly)", timestamp: "12s ago", status: "active" },
-    { id: "mock-mf-2", message: "Neodymium export restriction flagged in CN customs data", timestamp: "45s ago", status: "done" },
-    { id: "mock-mf-3", message: "Updated 14 mineral price feeds from Bloomberg & USGS", timestamp: "2m ago", status: "done" },
-    { id: "mock-mf-4", message: "Platinum urgency elevated to 0.51 — PGM supply tightening", timestamp: "4m ago", status: "done" },
-  ],
-  targeting: [
-    { id: "mock-tg-1", message: "Composite scoring 847 NEA candidates against cobalt urgency", timestamp: "8s ago", status: "active" },
-    { id: "mock-tg-2", message: "Δv matrix computed for top 50 accessible targets", timestamp: "1m ago", status: "done" },
-    { id: "mock-tg-3", message: "Ranked 16 Psyche #1 — net value $10.2T, Δv 5.82 km/s", timestamp: "3m ago", status: "done" },
-    { id: "mock-tg-4", message: "Generating 5 mission route variants across M-type cluster", timestamp: "5m ago", status: "done" },
-  ],
-  valuation: [
-    { id: "mock-vl-1", message: "Deep research complete: Ryugu composition 86% confidence", timestamp: "18s ago", status: "done" },
-    { id: "mock-vl-2", message: "Fast valuation pass: 412 asteroids in 12s", timestamp: "2m ago", status: "done" },
-    { id: "mock-vl-3", message: "Scenario impact applied: +18% on neodymium-weighted targets", timestamp: "6m ago", status: "done" },
-    { id: "mock-vl-4", message: "Valuation cache refreshed — 847 asteroids valued", timestamp: "8m ago", status: "done" },
-  ],
-  mission_report: [
-    { id: "mock-mr-1", message: "Mission profile queued for 16 Psyche (M-type, Co+Ni focus)", timestamp: "30s ago", status: "done" },
-    { id: "mock-mr-2", message: "Δv budget analysis: 8.2 km/s round-trip feasible", timestamp: "3m ago", status: "done" },
-    { id: "mock-mr-3", message: "Extractable mass estimate: 1.2×10¹⁵ kg iron-nickel", timestamp: "7m ago", status: "done" },
-    { id: "mock-mr-4", message: "Awaiting target selection for full mission brief", timestamp: "10m ago", status: "done" },
-  ],
-};
-
-const MOCK_AGENT_CARD_STATUS: Record<string, "active" | "idle" | "complete"> = {
-  market_feed: "active",
-  targeting: "active",
-  valuation: "complete",
-  mission_report: "idle",
-};
 
 interface AgentActivityProps {
   agentStatuses?: Record<string, AgentStatus>;
@@ -209,12 +174,6 @@ export function AgentActivity({
     });
   }, [agentStatuses]);
 
-  const hasLiveMessages =
-    Object.values(agentHistory).some((entries) => entries.length > 0) ||
-    Object.values(agentStatuses ?? {}).some((s) => Boolean(s.message));
-
-  const isLive = hasLiveMessages;
-
   let activeCount = 0;
   let idleCount = 0;
   let completeCount = 0;
@@ -241,14 +200,9 @@ export function AgentActivity({
               THE INTELLIGENCE
             </h2>
             <span className="flex items-center gap-1.5 text-xs font-mono uppercase tracking-wider px-2 py-1 rounded"
-              style={{
-                background: isLive ? "rgba(52,211,153,0.1)" : "rgba(251,191,36,0.1)",
-                color: isLive ? "var(--positive)" : "var(--warning)",
-              }}>
-              <div className={`w-1.5 h-1.5 rounded-full ${isLive ? "pulse-active" : ""}`}
-                style={{ background: isLive ? "var(--positive)" : "var(--warning)" }}
-              />
-              {isLive ? "LIVE" : "SIMULATED"}
+              style={{ background: "rgba(52,211,153,0.1)", color: "var(--positive)" }}>
+              <div className="w-1.5 h-1.5 rounded-full pulse-active" style={{ background: "var(--positive)" }} />
+              LIVE
             </span>
           </div>
           <p className="text-base" style={{ color: "var(--dust)" }}>
@@ -260,24 +214,25 @@ export function AgentActivity({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {AGENT_DEFS.map((def, i) => {
             const liveStatus = agentStatuses?.[def.key];
-            const liveHistory = agentHistory[def.key];
-            const useMock =
-              !isLive && !liveStatus?.message && (liveHistory ?? []).length === 0;
+            const liveHistory = agentHistory[def.key] ?? [];
 
             let cardStatus: "active" | "idle" | "complete" = "idle";
-            if (useMock) {
-              cardStatus = MOCK_AGENT_CARD_STATUS[def.key] ?? "idle";
-            } else if (liveStatus?.status === "active" || liveStatus?.status === "researching") {
+            if (liveStatus?.status === "active" || liveStatus?.status === "researching") {
               cardStatus = "active";
-            } else if (liveStatus?.status === "idle" || liveStatus?.status === "complete") {
+            } else if (
+              liveStatus?.status === "complete" ||
+              (liveHistory.length > 0 && liveStatus?.status !== "idle")
+            ) {
               cardStatus = "complete";
+            } else if (liveHistory.length > 0) {
+              cardStatus = liveHistory[0].status === "active" ? "active" : "complete";
             }
 
             if (cardStatus === "active") activeCount++;
             else if (cardStatus === "complete") completeCount++;
             else idleCount++;
 
-            const entries = useMock ? MOCK_AGENT_ENTRIES[def.key] ?? [] : liveHistory ?? [];
+            const entries = liveHistory;
 
             return (
               <AgentCard
@@ -308,7 +263,7 @@ export function AgentActivity({
           style={{ color: "var(--dust-dim)" }}
         >
           <div className="flex items-center gap-2">
-            <div className={`w-1.5 h-1.5 rounded-full ${isLive ? "pulse-active" : ""}`} style={{ background: "var(--signal)" }} />
+            <div className={`w-1.5 h-1.5 rounded-full ${activeCount > 0 ? "pulse-active" : ""}`} style={{ background: "var(--signal)" }} />
             <span>{activeCount} active</span>
           </div>
           <div className="flex items-center gap-2">
@@ -320,7 +275,7 @@ export function AgentActivity({
             <span>{idleCount} idle</span>
           </div>
           <span className="ml-auto tracking-wide">
-            {isLive ? "Live Gemini agent activity" : "Simulated agent activity — awaiting WebSocket feed"}
+            Live Gemini agent activity — parallel market, valuation, routing, and mission agents
           </span>
         </motion.div>
       </div>

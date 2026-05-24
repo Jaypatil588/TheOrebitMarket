@@ -50,6 +50,11 @@ func main() {
 	go hub.Run()
 	log.Println("[MAIN] WebSocket hub running")
 
+	// Push cached DB snapshot to each new WS client (prices + rankings without waiting for agents)
+	hub.OnClientConnect(func(c *websocket.Client) {
+		websocket.PushDBSnapshot(store, c)
+	})
+
 	// Wire and start all agents
 	orch := agents.NewOrchestrator(geminiClient, store, hub, eng)
 	orch.Start()

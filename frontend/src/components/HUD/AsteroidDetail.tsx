@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { AsteroidData } from "../Map3D/AsteroidBelt";
 import { formatValue } from "@/lib/utils";
 import { BACKEND_URL } from "@/lib/config";
+import { toImageSrc } from "@/lib/asteroidSelection";
+import type { MissionReportData } from "@/types/orebit";
 import {
   X,
   CircleDot,
@@ -18,6 +20,8 @@ import {
   Zap,
   AlertTriangle,
   Loader,
+  Sparkles,
+  ImageIcon,
 } from "lucide-react";
 
 // Shape returned when Agent 1 has enriched the asteroid
@@ -156,6 +160,17 @@ function mineralLabel(key: string): string {
     .trim();
 }
 
+function ImageTile({ label, src }: { label: string; src: string }) {
+  return (
+    <div className="space-y-1">
+      <span className="text-[10px] text-slate-500 uppercase tracking-wider">{label}</span>
+      <div className="aspect-square rounded overflow-hidden border border-white/[0.06] bg-slate-900/50">
+        <img src={src} alt={label} className="w-full h-full object-cover" />
+      </div>
+    </div>
+  );
+}
+
 const SPEC_BADGE: Record<string, { label: string; color: string }> = {
   C: { label: "Carbonaceous", color: "text-slate-300 bg-slate-700/60 border-slate-600/40" },
   S: { label: "Silicaceous", color: "text-amber-300 bg-amber-900/30 border-amber-700/40" },
@@ -165,32 +180,139 @@ const SPEC_BADGE: Record<string, { label: string; color: string }> = {
 
 // ─── main component ───────────────────────────────────────────────────────────
 
+interface RouteImagesState {
+  heatmap_url?: string;
+  surface_url?: string;
+  loading: boolean;
+  error: boolean;
+}
+
 interface AsteroidDetailProps {
   selectedAsteroid: AsteroidData | null;
+  routeId?: string;
+  missionReport?: MissionReportData | null;
+  /** Instant client-side demo report — skips Agent 4 / route-image fetches. */
+  precompiledReport?: boolean;
   onClose: () => void;
 }
 
-export function AsteroidDetail({ selectedAsteroid, onClose }: AsteroidDetailProps) {
+function missionReportForAsteroid(
+  missionReport: MissionReportData | null | undefined,
+  asteroidId: string
+): Record<string, unknown> | null {
+  if (!missionReport || missionReport.asteroid_id !== asteroidId) return null;
+  const r = missionReport.report;
+  if (!r || typeof r !== "object") return null;
+  return r as Record<string, unknown>;
+}
+
+export function AsteroidDetail({
+  selectedAsteroid,
+  routeId,
+  missionReport,
+  precompiledReport = false,
+  onClose,
+}: AsteroidDetailProps) {
   const [api, setApi] = useState<EnrichedPayload | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
+  const [routeImages, setRouteImages] = useState<RouteImagesState>({
+    loading: false,
+    error: false,
+  });
+  const [reportGenerating, setReportGenerating] = useState(false);
 
   useEffect(() => {
     if (!selectedAsteroid) {
       setApi(null);
+      setRouteImages({ loading: false, error: false });
+      setReportGenerating(false);
       return;
     }
     setLoading(true);
     setError(false);
     setApi(null);
-    fetch(`${BACKEND_URL}/api/asteroid/${selectedAsteroid.id}`)
+    setReportGenerating(!!routeId && !precompiledReport);
+
+    const detailUrl = routeId
+      ? `${BACKEND_URL}/api/asteroid/${selectedAsteroid.id}?route_id=${encodeURIComponent(routeId)}`
+      : `${BACKEND_URL}/api/asteroid/${selectedAsteroid.id}`;
+
+    fetch(detailUrl)
       .then((r) => {
         if (!r.ok) throw new Error();
         return r.json();
       })
-      .then((d: EnrichedPayload) => { setApi(d); setLoading(false); })
-      .catch(() => { setError(true); setLoading(false); });
-  }, [selectedAsteroid?.id]);
+      .then((d: EnrichedPayload) => {
+        setApi(d);
+        setLoading(false);
+      })
+      .catch(() => {
+        setError(true);
+        setLoading(false);
+      })
+      .finally(() => {
+        if (!routeId) setReportGenerating(false);
+      });
+  }, [selectedAsteroid?.id, routeId, precompiledReport]);
+
+  useEffect(() => {
+    if (precompiledReport) {
+      setReportGenerating(false);
+    }
+  }, [precompiledReport, selectedAsteroid?.id]);
+
+  useEffect(() => {
+    if (!reportGenerating) return;
+    const t = setTimeout(() => setReportGenerating(false), 90_000);
+    return () => clearTimeout(t);
+  }, [reportGenerating, selectedAsteroid?.id]);
+
+  useEffect(() => {
+    if (precompiledReport || !selectedAsteroid || !routeId) {
+      if (precompiledReport) {
+        setRouteImages({ loading: false, error: false });
+      } else if (!selectedAsteroid || !routeId) {
+        setRouteImages({ loading: false, error: false });
+      }
+      return;
+    }
+
+    setRouteImages({ loading: true, error: false });
+    fetch(`${BACKEND_URL}/api/route-images`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        route_id: routeId,
+        asteroid_ids: [selectedAsteroid.id],
+      }),
+    })
+      .then((r) => {
+        if (!r.ok) throw new Error();
+        return r.json();
+      })
+      .then((data) => {
+        setRouteImages({
+          heatmap_url: data.heatmap_url,
+          surface_url: data.surface_url,
+          loading: false,
+          error: false,
+        });
+      })
+      .catch(() => {
+        setRouteImages({ loading: false, error: true });
+      });
+  }, [selectedAsteroid?.id, routeId, precompiledReport]);
+
+  useEffect(() => {
+    if (
+      missionReport &&
+      missionReport.asteroid_id === selectedAsteroid?.id &&
+      missionReport.report
+    ) {
+      setReportGenerating(false);
+    }
+  }, [missionReport, selectedAsteroid?.id]);
 
   if (!selectedAsteroid) return null;
 
@@ -224,6 +346,55 @@ export function AsteroidDetail({ selectedAsteroid, onClose }: AsteroidDetailProp
   const computedAt = api?.computed_at
     ? new Date(api.computed_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
     : null;
+
+  const reportPayload = missionReportForAsteroid(missionReport, selectedAsteroid.id);
+  const missionImages = reportPayload
+    ? {
+        render: toImageSrc(String(reportPayload.asteroid_render ?? "")),
+        composition: toImageSrc(String(reportPayload.composition_map ?? "")),
+        route: toImageSrc(String(reportPayload.route_map ?? "")),
+        profile: toImageSrc(String(reportPayload.physical_profile ?? "")),
+      }
+    : null;
+  const hasMissionImages =
+    missionImages &&
+    (missionImages.render ||
+      missionImages.composition ||
+      missionImages.route ||
+      missionImages.profile);
+  const missionImagesLoading = reportGenerating && !hasMissionImages;
+
+  const executiveSummary =
+    typeof reportPayload?.executive_summary === "string" ? reportPayload.executive_summary : null;
+  const routeRationale =
+    typeof reportPayload?.route_rationale === "string" ? reportPayload.route_rationale : null;
+  const feasibilityScore =
+    typeof reportPayload?.feasibility_score === "number" ? reportPayload.feasibility_score : null;
+  const goNoGo =
+    reportPayload?.go_no_go && typeof reportPayload.go_no_go === "object"
+      ? (reportPayload.go_no_go as Record<string, string>)
+      : null;
+  const missionBrief =
+    reportPayload?.mission && typeof reportPayload.mission === "object"
+      ? (reportPayload.mission as Record<string, unknown>)
+      : null;
+  const compositionNotes =
+    reportPayload?.composition &&
+    typeof reportPayload.composition === "object" &&
+    typeof (reportPayload.composition as Record<string, unknown>).research_notes === "string"
+      ? String((reportPayload.composition as Record<string, unknown>).research_notes)
+      : null;
+  const marketBrief =
+    reportPayload?.market && typeof reportPayload.market === "object"
+      ? (reportPayload.market as Record<string, unknown>)
+      : null;
+  const briefValuation =
+    reportPayload?.valuation && typeof reportPayload.valuation === "object"
+      ? (reportPayload.valuation as Record<string, number>)
+      : null;
+  const hasMissionBrief = Boolean(
+    executiveSummary || routeRationale || goNoGo?.primary_reason_go || missionBrief
+  );
 
   return (
     <AnimatePresence>
@@ -288,6 +459,12 @@ export function AsteroidDetail({ selectedAsteroid, onClose }: AsteroidDetailProp
                 )}
                 {val?.roi != null && (
                   <Row label="ROI" value={`${(val.roi / 1e6).toFixed(1)}M×`} accent />
+                )}
+                {!val?.roi && briefValuation?.roi_pct != null && (
+                  <Row label="ROI" value={`${briefValuation.roi_pct.toFixed(0)}%`} accent />
+                )}
+                {briefValuation?.mission_cost_usd != null && val?.mission_cost_usd == null && (
+                  <Row label="Est. Mission Cost" value={formatValue(briefValuation.mission_cost_usd)} />
                 )}
                 {topMineral && (
                   <Row label="Primary Target" value={mineralLabel(topMineral)} accent />
@@ -417,6 +594,144 @@ export function AsteroidDetail({ selectedAsteroid, onClose }: AsteroidDetailProp
                 <p className="text-xs text-slate-400 leading-relaxed">
                   {api.research_summary}
                 </p>
+              </Section>
+            )}
+
+            {/* ── MISSION BRIEF (Agent 4 / precompiled demo) ── */}
+            {hasMissionBrief && (
+              <Section icon={<Sparkles size={13} />} title="Mission Brief">
+                {precompiledReport && (
+                  <p className="text-xs text-emerald-500/80 font-mono">Analysis complete — intelligence report ready</p>
+                )}
+                {feasibilityScore != null && (
+                  <Row label="Feasibility" value={`${feasibilityScore}/10`} accent />
+                )}
+                {goNoGo?.recommendation && (
+                  <motion.div className="flex items-center gap-2 text-xs">
+                    <span className="text-slate-500">Recommendation</span>
+                    <span
+                      className={`font-bold px-2 py-0.5 rounded ${
+                        goNoGo.recommendation === "GO"
+                          ? "text-emerald-400 bg-emerald-500/10"
+                          : "text-amber-400 bg-amber-500/10"
+                      }`}
+                    >
+                      {goNoGo.recommendation}
+                    </span>
+                  </motion.div>
+                )}
+                {executiveSummary && (
+                  <p className="text-xs text-slate-400 leading-relaxed">{executiveSummary}</p>
+                )}
+                {routeRationale && (
+                  <div className="space-y-1">
+                    <span className="text-[10px] text-slate-500 uppercase tracking-wider">Route Rationale</span>
+                    <p className="text-xs text-slate-400 leading-relaxed">{routeRationale}</p>
+                  </div>
+                )}
+                {compositionNotes && (
+                  <div className="space-y-1">
+                    <span className="text-[10px] text-slate-500 uppercase tracking-wider">Composition Analysis</span>
+                    <p className="text-xs text-slate-400 leading-relaxed">{compositionNotes}</p>
+                  </div>
+                )}
+                {missionBrief && (
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-2 pt-1">
+                    {typeof missionBrief.launch_vehicle === "string" && (
+                      <div>
+                        <Label>Launch Vehicle</Label>
+                        <Val>{missionBrief.launch_vehicle}</Val>
+                      </div>
+                    )}
+                    {typeof missionBrief.mining_method === "string" && (
+                      <div>
+                        <Label>Mining Method</Label>
+                        <Val>{missionBrief.mining_method}</Val>
+                      </div>
+                    )}
+                    {typeof missionBrief.next_launch_window === "string" && (
+                      <div>
+                        <Label>Launch Window</Label>
+                        <Val accent>{missionBrief.next_launch_window}</Val>
+                      </div>
+                    )}
+                    {typeof missionBrief.delta_v_km_s === "number" && (
+                      <div>
+                        <Label>Mission Δv</Label>
+                        <Val>{missionBrief.delta_v_km_s.toFixed(2)} km/s</Val>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {goNoGo?.primary_reason_go && (
+                  <p className="text-xs text-emerald-400/90 leading-relaxed">{goNoGo.primary_reason_go}</p>
+                )}
+                {marketBrief && typeof marketBrief.demand_outlook === "string" && (
+                  <p className="text-xs text-slate-500 leading-relaxed">{marketBrief.demand_outlook}</p>
+                )}
+              </Section>
+            )}
+
+            {/* ── MISSION REPORT IMAGES (Agent 4 + route scaffold) ── */}
+            {(routeId || precompiledReport || hasMissionImages || routeImages.heatmap_url || routeImages.surface_url) && (
+              <Section icon={<Sparkles size={13} />} title="Mission Visuals">
+                {(missionImagesLoading || routeImages.loading) && (
+                  <div className="flex items-center gap-2 text-slate-500 text-xs py-2">
+                    <Loader size={12} className="animate-spin text-amber-500/70" />
+                    {missionImagesLoading
+                      ? "Agent 4 generating mission brief & renders…"
+                      : "Loading route visualizations…"}
+                  </div>
+                )}
+
+                {missionReport?.cached && hasMissionImages && !precompiledReport && (
+                  <p className="text-xs text-emerald-500/80 font-mono">Cached mission report</p>
+                )}
+                {precompiledReport && hasMissionImages && (
+                  <p className="text-xs text-emerald-500/80 font-mono">Mission visuals ready</p>
+                )}
+
+                {hasMissionImages && (
+                  <div className="grid grid-cols-2 gap-2">
+                    {missionImages.render && (
+                      <ImageTile label="Asteroid Render" src={missionImages.render} />
+                    )}
+                    {missionImages.composition && (
+                      <ImageTile label="Composition Map" src={missionImages.composition} />
+                    )}
+                    {missionImages.route && (
+                      <ImageTile label="Route Map" src={missionImages.route} />
+                    )}
+                    {missionImages.profile && (
+                      <ImageTile label="Physical Profile" src={missionImages.profile} />
+                    )}
+                  </div>
+                )}
+
+                {!routeImages.loading && (routeImages.heatmap_url || routeImages.surface_url) && (
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    {routeImages.heatmap_url && (
+                      <ImageTile label="Route Heatmap" src={routeImages.heatmap_url} />
+                    )}
+                    {routeImages.surface_url && (
+                      <ImageTile label="Surface Scan" src={routeImages.surface_url} />
+                    )}
+                  </div>
+                )}
+
+                {routeImages.error && !hasMissionImages && !routeImages.loading && (
+                  <div className="flex items-center gap-2 text-slate-500 text-xs">
+                    <AlertTriangle size={12} className="text-amber-500/80" />
+                    Route visuals unavailable
+                  </div>
+                )}
+
+                {!missionImagesLoading && !routeImages.loading && !hasMissionImages && !routeImages.heatmap_url && !routeImages.surface_url && !routeImages.error && routeId && (
+                  <div className="flex items-center gap-2 text-slate-600 text-xs">
+                    <ImageIcon size={12} />
+                    Images will appear when Agent 4 completes
+                  </div>
+                )}
               </Section>
             )}
 
