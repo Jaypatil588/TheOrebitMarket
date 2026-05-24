@@ -9,7 +9,7 @@ import { AsteroidBelt, AsteroidData } from "./AsteroidBelt";
 import { RouteLines } from "./RouteLines";
 import { useCameraControls } from "@/hooks/useCameraControls";
 import { MissionRoute } from "@/hooks/useWebSockets";
-import { getRouteAsteroidIds, needsRoutePlacement } from "@/lib/mockRoutePlacement";
+import { getRouteAsteroidIds, getRoutePlacementIds } from "@/lib/mockRoutePlacement";
 
 // ─── Toggle to true to render the shadow camera frustum wireframe in the browser ───
 const DEBUG_SHADOW_CAMERA = false;
@@ -88,7 +88,10 @@ function SceneContent({
   const selectedRingIndex =
     selectedAsteroid !== null ? selectedAsteroid.ringIndex : null;
 
-  const mockRoutePlacement = needsRoutePlacement(routes, demoActive);
+  const routePlacementIds = useMemo(
+    () => getRoutePlacementIds(routes, demoActive),
+    [routes, demoActive]
+  );
 
   const defaultRoute = useMemo(() => {
     if (!routes || routes.length === 0) return null;
@@ -193,7 +196,7 @@ function SceneContent({
         selectedAsteroid={selectedAsteroid}
         onSelectAsteroid={onSelectAsteroid}
         onHoverRing={onHoverRing}
-        mockRoutePlacement={mockRoutePlacement}
+        routePlacementIds={routePlacementIds}
         routedAsteroidIds={routedAsteroidIds}
         routeColor={routeColor}
       />
@@ -201,7 +204,7 @@ function SceneContent({
       <RouteLines
         selectedAsteroid={selectedAsteroid}
         routes={routes}
-        mockRoutePlacement={mockRoutePlacement}
+        routePlacementIds={routePlacementIds}
       />
     </>
   );

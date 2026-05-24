@@ -3,7 +3,7 @@ import { Line } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import type { MissionRoute } from "@/types/orebit";
-import { applyMockRouteCameraFacingAngle } from "@/lib/mockRoutePlacement";
+import { applyRouteCameraFacingAngle } from "@/lib/mockRoutePlacement";
 
 const ROUTE_YELLOW = "#facc15";
 
@@ -20,7 +20,7 @@ interface AsteroidPosition {
 interface RouteLinesProps {
   selectedAsteroid: { x: number; y: number; z: number } | null;
   routes?: MissionRoute[];
-  mockRoutePlacement?: boolean;
+  routePlacementIds?: readonly string[];
 }
 
 const CENTER_X = -6;
@@ -134,7 +134,7 @@ function LiveRouteLine({
 export function RouteLines({
   selectedAsteroid,
   routes,
-  mockRoutePlacement = false,
+  routePlacementIds = [],
 }: RouteLinesProps) {
   const [asteroidPositions, setAsteroidPositions] = useState<Map<string, AsteroidPosition>>(
     new Map()
@@ -149,9 +149,10 @@ export function RouteLines({
 
         const posMap = new Map<string, AsteroidPosition>();
         data.forEach((ast) => {
-          const placed = mockRoutePlacement
-            ? applyMockRouteCameraFacingAngle(ast)
-            : ast;
+          const placed =
+            routePlacementIds.length > 0
+              ? applyRouteCameraFacingAngle(ast, routePlacementIds)
+              : ast;
           const radius = radii[placed.ringIndex] || 6.0;
           posMap.set(placed.id, {
             ...placed,
@@ -163,7 +164,7 @@ export function RouteLines({
         setAsteroidPositions(posMap);
       })
       .catch((err) => console.error("[RouteLines] Failed to load asteroids:", err));
-  }, [mockRoutePlacement]);
+  }, [routePlacementIds]);
 
   const defaultRoute = useMemo(() => {
     if (!routes || routes.length === 0) return null;

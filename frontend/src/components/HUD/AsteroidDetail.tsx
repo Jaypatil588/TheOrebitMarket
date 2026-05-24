@@ -316,8 +316,25 @@ export function AsteroidDetail({
 
   if (!selectedAsteroid) return null;
 
+  const reportPayload = missionReportForAsteroid(missionReport, selectedAsteroid.id);
+  const precompiledComposition =
+    precompiledReport &&
+    reportPayload?.composition &&
+    typeof reportPayload.composition === "object" &&
+    typeof (reportPayload.composition as Record<string, unknown>).mineral_fractions === "object"
+      ? ((reportPayload.composition as Record<string, unknown>).mineral_fractions as Record<string, number>)
+      : null;
+  const precompiledSpecType =
+    precompiledReport &&
+    reportPayload?.composition &&
+    typeof reportPayload.composition === "object" &&
+    typeof (reportPayload.composition as Record<string, unknown>).spec_type === "string"
+      ? String((reportPayload.composition as Record<string, unknown>).spec_type)
+      : null;
+
   // ── resolve display values: API data wins, scene data is fallback ──
-  const specType = api?.spec_type || selectedAsteroid.spec_type || selectedAsteroid.specType || "C";
+  const specType =
+    api?.spec_type || precompiledSpecType || selectedAsteroid.spec_type || selectedAsteroid.specType || "C";
   const specInfo = SPEC_BADGE[specType] ?? SPEC_BADGE["X"];
 
   const displayName =
@@ -327,7 +344,7 @@ export function AsteroidDetail({
   const massKg = api?.mass_kg ?? selectedAsteroid.mass ?? null;
 
   // Composition — API fractions (0–1) or raw percentages (0–100); scene is always 0–100
-  const rawComp = api?.composition ?? selectedAsteroid.composition ?? {};
+  const rawComp = api?.composition ?? precompiledComposition ?? selectedAsteroid.composition ?? {};
   const compEntries = Object.entries(rawComp)
     .map(([k, v]) => [k, v <= 1 ? v * 100 : v] as [string, number])
     .sort((a, b) => b[1] - a[1]);
@@ -335,7 +352,13 @@ export function AsteroidDetail({
   // Valuation — enriched agent data or raw estimate
   const val = api?.valuation;
   const netValue = val?.net_value_usd ?? api?.valueUSD ?? selectedAsteroid.valueUSD;
-  const topMineral = val?.top_mineral;
+  const reportMarket =
+    reportPayload?.market && typeof reportPayload.market === "object"
+      ? (reportPayload.market as Record<string, unknown>)
+      : null;
+  const topMineral =
+    val?.top_mineral ??
+    (typeof reportMarket?.primary_mineral === "string" ? reportMarket.primary_mineral : undefined);
   const isEnriched = !!val;
 
   // Top 6 market prices from snapshot
@@ -347,7 +370,6 @@ export function AsteroidDetail({
     ? new Date(api.computed_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
     : null;
 
-  const reportPayload = missionReportForAsteroid(missionReport, selectedAsteroid.id);
   const missionImages = reportPayload
     ? {
         render: toImageSrc(String(reportPayload.asteroid_render ?? "")),

@@ -1,7 +1,7 @@
 import { useRef, useMemo, useState, useEffect } from "react";
 import { useFrame, useLoader } from "@react-three/fiber";
 import * as THREE from "three";
-import { applyMockRouteCameraFacingAngle } from "@/lib/mockRoutePlacement";
+import { applyRouteCameraFacingAngle } from "@/lib/mockRoutePlacement";
 
 export interface AsteroidData {
   id: string;
@@ -27,8 +27,8 @@ interface AsteroidBeltProps {
   selectedAsteroid: AsteroidData | null;
   onSelectAsteroid: (asteroid: AsteroidData | null) => void;
   onHoverRing: (ringIndex: number | null) => void;
-  /** When true, Psyche/Pallas (mock route stops) start on the camera-facing belt arc. */
-  mockRoutePlacement?: boolean;
+  /** Asteroid IDs repositioned to the camera-facing belt arc for the active route. */
+  routePlacementIds?: readonly string[];
   /** Asteroid IDs on the active mission route — highlighted with routeColor. */
   routedAsteroidIds?: string[];
   routeColor?: string;
@@ -44,7 +44,7 @@ export function AsteroidBelt({
   selectedAsteroid,
   onSelectAsteroid,
   onHoverRing,
-  mockRoutePlacement = false,
+  routePlacementIds = [],
   routedAsteroidIds = [],
   routeColor = "#22d3ee",
 }: AsteroidBeltProps) {
@@ -99,9 +99,10 @@ export function AsteroidBelt({
 
         // Map elements into initial 3D positions with linear visual sizes
         const loaded = data.map((ast) => {
-          const placed = mockRoutePlacement
-            ? applyMockRouteCameraFacingAngle(ast)
-            : ast;
+          const placed =
+            routePlacementIds.length > 0
+              ? applyRouteCameraFacingAngle(ast, routePlacementIds)
+              : ast;
           const radius = radii[placed.ringIndex] || 6.0;
           const d = placed.diameter_km !== undefined ? placed.diameter_km : (placed.DiameterKm !== undefined ? placed.DiameterKm : 1.0);
 
@@ -122,7 +123,7 @@ export function AsteroidBelt({
       .catch((err) => {
         console.error("[AsteroidBelt] Error fetching dataset:", err);
       });
-  }, [radii, mockRoutePlacement]);
+  }, [radii, routePlacementIds]);
 
   // Generate unique deformed low-poly geometries for each asteroid to look like craggy rocks in space
   const deformedGeometries = useMemo(() => {

@@ -6,6 +6,20 @@ export function isFirstRankingRow(rank: RankedAsteroid): boolean {
   return rank.rank === 1;
 }
 
+const PRECOMPILED_MINERAL_BREAKDOWN: [string, number][] = [
+  ["nickel", 52],
+  ["cobalt", 33],
+  ["palladium", 15],
+];
+
+const PRECOMPILED_MINERAL_FRACTIONS: Record<string, number> = {
+  nickel: 52,
+  cobalt: 33,
+  palladium: 15,
+};
+
+const PRECOMPILED_MINERAL_LABEL = "nickel, cobalt, and palladium";
+
 function svgDataUrl(svg: string): string {
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
@@ -42,6 +56,7 @@ function compositionMapSvg(name: string, minerals: [string, number][]): string {
     iron: "#8B8B8B",
     nickel: "#B8860B",
     cobalt: "#4169E1",
+    palladium: "#E5E4E2",
     platinum: "#E5E4E2",
     platinumGroup: "#E5E4E2",
     water_ice: "#87CEEB",
@@ -124,17 +139,11 @@ function physicalProfileSvg(name: string, rank: RankedAsteroid): string {
 /** Client-side demo mission report for rank #1 — never persisted to DB. */
 export function buildPrecompiledMissionReport(rank: RankedAsteroid): MissionReportData {
   const shortName = rank.name.replace(/^\d+\s+/, "");
-  const specType = rank.spec_type || "M";
-  const diameterKm = specType === "M" ? 226 : specType === "S" ? 0.5 : 1.0;
-
-  const mineralBreakdown: [string, number][] =
-    rank.top_mineral === "iron"
-      ? [["iron", 85], ["nickel", 8], ["cobalt", 4], ["platinumGroup", 2], ["silicates", 1]]
-      : rank.top_mineral === "platinum"
-        ? [["platinumGroup", 42], ["nickel", 28], ["iron", 18], ["cobalt", 8], ["silicates", 4]]
-        : [["stonyMatrix", 45], ["iron", 22], ["water_ice", 15], [rank.top_mineral, 12], ["carbon", 6]];
-
+  const specType = "M";
+  const diameterKm = 226;
+  const mineralBreakdown = PRECOMPILED_MINERAL_BREAKDOWN;
   const launchWindow = rank.launch_window_year ?? 2028;
+  const primaryMineral = "nickel";
 
   return {
     asteroid_id: rank.asteroid_id,
@@ -143,8 +152,8 @@ export function buildPrecompiledMissionReport(rank: RankedAsteroid): MissionRepo
     report: {
       precompiled: true,
       feasibility_score: 9,
-      executive_summary: `${rank.name} ranks #1 on Orebit's strategic index with a composite score of ${(rank.composite_score * 100).toFixed(0)}%. As a ${specType}-type body in the main belt, it offers ${formatValue(rank.net_value_usd)} in damped net asset value against an estimated mission cost profile yielding ${rank.roi.toFixed(0)}% ROI. Primary extraction target: ${rank.top_mineral.replace(/_/g, " ")} — currently at elevated market urgency (${Math.round(rank.mineral_urgency * 100)}%).`,
-      route_rationale: `Selected for the default multi-stop corridor: Δv budget of ${rank.delta_v_km_s.toFixed(2)} km/s fits Falcon Heavy + ion-tug architecture. Launch window ${launchWindow} aligns with favorable opposition geometry and minimizes plane-change penalties. ${shortName} anchors the route's mineral diversification — high mass fraction ${rank.top_mineral} offsets downstream stops with lower metal content.`,
+      executive_summary: `${rank.name} ranks #1 on Orebit's strategic index with a composite score of ${(rank.composite_score * 100).toFixed(0)}%. As an ${specType}-type body, it offers ${formatValue(rank.net_value_usd)} in damped net asset value against an estimated mission cost profile yielding ${rank.roi.toFixed(0)}% ROI. Primary extraction suite: ${PRECOMPILED_MINERAL_LABEL} (52% Ni, 33% Co, 15% Pd) — aligned with elevated battery-metal and PGM urgency (${Math.round(rank.mineral_urgency * 100)}%).`,
+      route_rationale: `Selected for the default multi-stop corridor: Δv budget of ${rank.delta_v_km_s.toFixed(2)} km/s fits Falcon Heavy + ion-tug architecture. Launch window ${launchWindow} aligns with favorable opposition geometry and minimizes plane-change penalties. ${shortName} anchors the route's nickel-cobalt-palladium diversification — high Ni/Co mass fractions with recoverable Pd PGM credits offset downstream stops with lower metal content.`,
       asteroid_render: svgDataUrl(asteroidRenderSvg(rank.name, specType, diameterKm)),
       composition_map: svgDataUrl(compositionMapSvg(rank.name, mineralBreakdown)),
       route_map: svgDataUrl(routeMapSvg(rank.name, rank.delta_v_km_s)),
@@ -152,8 +161,9 @@ export function buildPrecompiledMissionReport(rank: RankedAsteroid): MissionRepo
       composition: {
         spec_type: specType,
         spec_confidence: 0.91,
-        research_notes: `Spectroscopic surveys confirm ${specType}-type signature consistent with ${rank.top_mineral}-rich regolith. Radar-derived bulk density supports a differentiated or partially exposed metallic core model — ideal for in-situ magnetic beneficiation before return haul.`,
-        density_kg_m3: specType === "M" ? 5300 : 2800,
+        mineral_fractions: PRECOMPILED_MINERAL_FRACTIONS,
+        research_notes: `Spectroscopic and radar surveys confirm an ${specType}-type signature with nickel-cobalt-palladium-rich metallic regolith (52% Ni, 33% Co, 15% Pd). Bulk density supports a differentiated or partially exposed metallic core — ideal for magnetic beneficiation of Ni/Co with palladium recovery from PGM-bearing phases before return haul.`,
+        density_kg_m3: 5300,
       },
       valuation: {
         raw_value_usd: rank.net_value_usd * 1.15,
@@ -164,7 +174,7 @@ export function buildPrecompiledMissionReport(rank: RankedAsteroid): MissionRepo
       mission: {
         launch_vehicle: "Falcon Heavy + Orebit Ion Tug",
         launch_vehicle_reason: `Δv ${rank.delta_v_km_s.toFixed(2)} km/s within FH envelope with tug assist for capture and departure`,
-        mining_method: specType === "M" ? "Magnetic rake + thermal fragmentation" : "Anchor drill + volatiles oven",
+        mining_method: "Magnetic rake + thermal fragmentation",
         mining_method_trl: 6,
         transit_days: 420,
         surface_ops_days: 240,
@@ -173,16 +183,16 @@ export function buildPrecompiledMissionReport(rank: RankedAsteroid): MissionRepo
         delta_v_km_s: rank.delta_v_km_s,
       },
       market: {
-        primary_mineral: rank.top_mineral,
+        primary_mineral: primaryMineral,
         urgency_score: rank.mineral_urgency,
-        demand_outlook: `${rank.top_mineral.replace(/_/g, " ")} demand projected +12–18% YoY through ${launchWindow + 2} on EV supply chain and defense stockpile replenishment.`,
+        demand_outlook: `Nickel, cobalt, and palladium demand projected +12–18% YoY through ${launchWindow + 2} on EV cathode chemistry, DRC supply risk, and defense PGM stockpile replenishment.`,
         price_trend: "rising",
       },
       go_no_go: {
         recommendation: "GO",
-        primary_reason_go: `Top-ranked target with ${rank.roi.toFixed(0)}% ROI, favorable Δv, and ${Math.round(rank.confidence * 100)}% agent confidence — proceed to Phase-B mission design.`,
+        primary_reason_go: `Top-ranked Ni-Co-Pd target with ${rank.roi.toFixed(0)}% ROI, favorable Δv, and ${Math.round(rank.confidence * 100)}% agent confidence — proceed to Phase-B mission design.`,
         primary_reason_no_go: "",
-        conditions_to_flip: "Downgrade to NO-GO if launch slips beyond 2030 or cobalt/platinum spot collapses >25%.",
+        conditions_to_flip: "Downgrade to NO-GO if launch slips beyond 2030 or nickel/cobalt/palladium spot collapses >25%.",
       },
       route_context: {
         route_label: "Primary Strategic Corridor",

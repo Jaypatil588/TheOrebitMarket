@@ -38,6 +38,7 @@ export default function Home() {
 
   const {
     marketPrices,
+    marketFeedLogs,
     rankings,
     routes,
     agentStatuses,
@@ -182,6 +183,7 @@ export default function Home() {
       />
       <AgentActivity
         agentStatuses={agentStatuses}
+        marketFeedLogs={marketFeedLogs}
         demoActive={demoActive}
         onDemoTrigger={handleDemoTrigger}
       />

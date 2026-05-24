@@ -22,12 +22,7 @@ export const MOCK_ROUTE_ASTEROID_IDS = MOCK_ROUTE.stops
   .filter((id): id is string => Boolean(id));
 
 /** Spread stops along the near-side arc so the dashed route reads clearly. */
-const MOCK_ANGLE_OFFSETS: Record<string, number> = {
-  "20000016": 0,
-  "20000002": 0.55,
-  "20000001": 0,
-  "20000010": 0.55,
-};
+const PLACEMENT_ANGLE_OFFSETS = [0, 0.55] as const;
 
 export { DEMO_ROUTE_ASTEROID_IDS };
 
@@ -35,7 +30,17 @@ export function isMockRouteOnly(routes?: MissionRoute[]): boolean {
   return !hasLiveRoutes(routes);
 }
 
-/** Map/3D preview routes — demo override when phrase triggered; live routes only otherwise. */
+/** Asteroid IDs whose belt positions should face the default camera for the active route. */
+export function getRoutePlacementIds(
+  routes?: MissionRoute[],
+  demoActive?: boolean
+): readonly string[] {
+  if (demoActive) return DEMO_ROUTE_ASTEROID_IDS;
+  if (isMockRouteOnly(routes)) return MOCK_ROUTE_ASTEROID_IDS;
+  return [];
+}
+
+/** Map/3D preview routes — demo override when phrase triggered; mock fallback when live empty. */
 export function getDisplayRoutes(
   routes?: MissionRoute[],
   options?: { demoActive?: boolean }
@@ -44,20 +49,43 @@ export function getDisplayRoutes(
   if (options?.demoActive) {
     return [{ ...DEMO_ROUTE, is_default: true }, ...live];
   }
-  return live;
+  if (live.length > 0) return live;
+  return [{ ...MOCK_ROUTE, is_default: true }];
 }
 
-/** Camera-facing placement for demo route stops on the 3D belt */
-export function needsRoutePlacement(_routes?: MissionRoute[], demoActive?: boolean): boolean {
-  return demoActive === true;
+export function needsRoutePlacement(routes?: MissionRoute[], demoActive?: boolean): boolean {
+  return getRoutePlacementIds(routes, demoActive).length > 0;
 }
 
+export function applyRouteCameraFacingAngle<T extends { id: string; angle: number }>(
+  asteroid: T,
+  placementIds: readonly string[]
+): T {
+  const idx = placementIds.indexOf(asteroid.id);
+  if (idx === -1) return asteroid;
+  const offset = PLACEMENT_ANGLE_OFFSETS[idx] ?? PLACEMENT_ANGLE_OFFSETS[1];
+  return { ...asteroid, angle: CAMERA_FACING_ORBIT_ANGLE + offset };
+}
+
+/** @deprecated Use applyRouteCameraFacingAngle with getRoutePlacementIds */
 export function applyMockRouteCameraFacingAngle<T extends { id: string; angle: number }>(
   asteroid: T
 ): T {
-  const offset = MOCK_ANGLE_OFFSETS[asteroid.id];
-  if (offset === undefined) return asteroid;
-  return { ...asteroid, angle: CAMERA_FACING_ORBIT_ANGLE + offset };
+  const offset = MOCK_ROUTE_ASTEROID_IDS.indexOf(asteroid.id);
+  if (offset === -1) {
+    const demoIdx = DEMO_ROUTE_ASTEROID_IDS.indexOf(
+      asteroid.id as (typeof DEMO_ROUTE_ASTEROID_IDS)[number]
+    );
+    if (demoIdx === -1) return asteroid;
+    return {
+      ...asteroid,
+      angle: CAMERA_FACING_ORBIT_ANGLE + (PLACEMENT_ANGLE_OFFSETS[demoIdx] ?? 0.55),
+    };
+  }
+  return {
+    ...asteroid,
+    angle: CAMERA_FACING_ORBIT_ANGLE + (PLACEMENT_ANGLE_OFFSETS[offset] ?? 0.55),
+  };
 }
 
 /** Asteroid IDs on a mission route (non-Earth stops with known IDs). */

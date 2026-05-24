@@ -28,10 +28,18 @@ import type {
   AgentStatus,
   MissionReportData,
 } from "@/types/orebit";
+import {
+  buildMarketUpdateLogLines,
+  formatAgentStatusLine,
+} from "@/lib/marketAgentLog";
+
+const MARKET_FEED_LOG_CAP = 120;
 
 export function useOrebitWebSocket(url?: string) {
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [marketFeedLogs, setMarketFeedLogs] = useState<string[]>([]);
   const [marketPrices, setMarketPrices] = useState<MarketPrice[]>([]);
+  const prevMarketPricesRef = useRef<Map<string, number>>(new Map());
   const [rankings, setRankings] = useState<RankedAsteroid[]>([]);
   const [routes, setRoutes] = useState<MissionRoute[]>([]);
   const [agentStatuses, setAgentStatuses] = useState<Record<string, AgentStatus>>({});
@@ -135,11 +143,23 @@ export function useOrebitWebSocket(url?: string) {
     ]);
   }, []);
 
+  const appendMarketFeedLogs = useCallback((lines: string[]) => {
+    if (lines.length === 0) return;
+    setMarketFeedLogs((prev) => [...prev, ...lines].slice(-MARKET_FEED_LOG_CAP));
+  }, []);
+
   const handleWsPayload = useCallback((data: Record<string, unknown>) => {
     switch (data.type) {
       case "market_update":
         if (isNonEmptyArray<MarketPrice>(data.prices)) {
-          setMarketPrices(data.prices);
+          const prices = data.prices;
+          const { lines, nextPrevious } = buildMarketUpdateLogLines(
+            prices,
+            prevMarketPricesRef.current
+          );
+          prevMarketPricesRef.current = nextPrevious;
+          appendMarketFeedLogs(lines);
+          setMarketPrices(prices);
         }
         break;
 
@@ -177,6 +197,9 @@ export function useOrebitWebSocket(url?: string) {
           asteroid_id: data.asteroid_id != null ? String(data.asteroid_id) : undefined,
         };
         setAgentStatuses((prev) => ({ ...prev, [status.agent]: status }));
+        if (status.agent === "market_feed" && status.message.trim()) {
+          appendMarketFeedLogs([formatAgentStatusLine(status.message)]);
+        }
         const logType =
           status.status === "error" ? "error" : status.status === "active" ? "info" : "success";
         addLog(logType, agentIdFor(status.agent), status.message);
@@ -200,7 +223,7 @@ export function useOrebitWebSocket(url?: string) {
         );
       }
     }
-  }, [addLog]);
+  }, [addLog, appendMarketFeedLogs]);
 
   // WebSocket connection + message routing (reconnect if backend starts after UI)
   useEffect(() => {
@@ -272,6 +295,7 @@ export function useOrebitWebSocket(url?: string) {
 
   return {
     logs,
+    marketFeedLogs,
     marketPrices,
     rankings,
     routes,

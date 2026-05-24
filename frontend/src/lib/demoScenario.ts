@@ -150,19 +150,44 @@ export function buildDemoPriceFeed(basePrices: MarketPrice[]): MarketPrice[] {
   return applyDemoPrices(basePrices);
 }
 
+function isDemoRouteTarget(rank: RankedAsteroid): boolean {
+  if (DEMO_ROUTE_ASTEROID_IDS.includes(rank.asteroid_id as (typeof DEMO_ROUTE_ASTEROID_IDS)[number])) {
+    return true;
+  }
+  const name = rank.name.toLowerCase();
+  return name.includes("ceres") || name.includes("hygiea");
+}
+
+/** Boost REE-relevant targets and pin demo route asteroids (Ceres, Hygiea) to #1/#2. */
 export function applyDemoRankings(rankings: RankedAsteroid[]): RankedAsteroid[] {
   const reeSet = new Set<string>(RARE_EARTH_MINERALS);
-  return rankings.map((r) => {
+  const boosted = rankings.map((r) => {
+    const isRouteTarget = isDemoRouteTarget(r);
     const isREE =
+      isRouteTarget ||
       reeSet.has(r.top_mineral) ||
       ["C", "B"].includes(r.spec_type);
     if (!isREE) return r;
     return {
       ...r,
       scenario_boosted: true,
-      mineral_urgency: Math.min(0.99, r.mineral_urgency + 0.22),
-      trend: "up",
-      reasoning: r.reasoning || "Scenario boost — China REE export block",
+      mineral_urgency: Math.min(
+        0.99,
+        r.mineral_urgency + (isRouteTarget ? 0.35 : 0.22)
+      ),
+      trend: "up" as const,
+      top_mineral: isRouteTarget && reeSet.has(r.top_mineral) ? r.top_mineral : isRouteTarget ? "neodymium" : r.top_mineral,
+      reasoning:
+        r.reasoning ||
+        (isRouteTarget
+          ? "Rare Earth Priority route anchor — China REE export block"
+          : "Scenario boost — China REE export block"),
     };
   });
+
+  const routeTargets = boosted
+    .filter(isDemoRouteTarget)
+    .sort((a, b) => b.mineral_urgency - a.mineral_urgency);
+  const others = boosted.filter((r) => !isDemoRouteTarget(r));
+  return [...routeTargets, ...others].map((r, i) => ({ ...r, rank: i + 1 }));
 }
