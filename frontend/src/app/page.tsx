@@ -39,6 +39,9 @@ export default function Home() {
   const {
     marketPrices,
     marketFeedLogs,
+    rankerFeedLogs,
+    valuationFeedLogs,
+    missionFeedLogs,
     rankings,
     routes,
     agentStatuses,
@@ -184,6 +187,9 @@ export default function Home() {
       <AgentActivity
         agentStatuses={agentStatuses}
         marketFeedLogs={marketFeedLogs}
+        rankerFeedLogs={rankerFeedLogs}
+        valuationFeedLogs={valuationFeedLogs}
+        missionFeedLogs={missionFeedLogs}
         demoActive={demoActive}
         onDemoTrigger={handleDemoTrigger}
       />

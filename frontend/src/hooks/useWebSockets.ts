@@ -32,14 +32,30 @@ import {
   buildMarketUpdateLogLines,
   formatAgentStatusLine,
 } from "@/lib/marketAgentLog";
+import {
+  buildRankingsUpdateLogLines,
+  formatRankerStatusLine,
+} from "@/lib/rankerAgentLog";
+import {
+  buildAgent1CompleteLogLines,
+  formatValuationStatusLine,
+} from "@/lib/valuationAgentLog";
+import {
+  buildMissionReportLogLines,
+  formatMissionStatusLine,
+} from "@/lib/missionAgentLog";
 
-const MARKET_FEED_LOG_CAP = 120;
+const AGENT_FEED_LOG_CAP = 120;
 
 export function useOrebitWebSocket(url?: string) {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [marketFeedLogs, setMarketFeedLogs] = useState<string[]>([]);
+  const [rankerFeedLogs, setRankerFeedLogs] = useState<string[]>([]);
+  const [valuationFeedLogs, setValuationFeedLogs] = useState<string[]>([]);
+  const [missionFeedLogs, setMissionFeedLogs] = useState<string[]>([]);
   const [marketPrices, setMarketPrices] = useState<MarketPrice[]>([]);
   const prevMarketPricesRef = useRef<Map<string, number>>(new Map());
+  const prevRankerUrgencyRef = useRef<Map<string, number>>(new Map());
   const [rankings, setRankings] = useState<RankedAsteroid[]>([]);
   const [routes, setRoutes] = useState<MissionRoute[]>([]);
   const [agentStatuses, setAgentStatuses] = useState<Record<string, AgentStatus>>({});
@@ -145,7 +161,22 @@ export function useOrebitWebSocket(url?: string) {
 
   const appendMarketFeedLogs = useCallback((lines: string[]) => {
     if (lines.length === 0) return;
-    setMarketFeedLogs((prev) => [...prev, ...lines].slice(-MARKET_FEED_LOG_CAP));
+    setMarketFeedLogs((prev) => [...prev, ...lines].slice(-AGENT_FEED_LOG_CAP));
+  }, []);
+
+  const appendRankerFeedLogs = useCallback((lines: string[]) => {
+    if (lines.length === 0) return;
+    setRankerFeedLogs((prev) => [...prev, ...lines].slice(-AGENT_FEED_LOG_CAP));
+  }, []);
+
+  const appendValuationFeedLogs = useCallback((lines: string[]) => {
+    if (lines.length === 0) return;
+    setValuationFeedLogs((prev) => [...prev, ...lines].slice(-AGENT_FEED_LOG_CAP));
+  }, []);
+
+  const appendMissionFeedLogs = useCallback((lines: string[]) => {
+    if (lines.length === 0) return;
+    setMissionFeedLogs((prev) => [...prev, ...lines].slice(-AGENT_FEED_LOG_CAP));
   }, []);
 
   const handleWsPayload = useCallback((data: Record<string, unknown>) => {
@@ -163,16 +194,42 @@ export function useOrebitWebSocket(url?: string) {
         }
         break;
 
-      case "rankings_update":
-        if (isNonEmptyArray<RankedAsteroid>(data.rankings)) {
-          setRankings(data.rankings);
+      case "rankings_update": {
+        const rankingsPayload = isNonEmptyArray<RankedAsteroid>(data.rankings)
+          ? data.rankings
+          : null;
+        const routesPayload = isNonEmptyArray<MissionRoute>(data.routes)
+          ? data.routes
+          : null;
+
+        if (rankingsPayload) {
+          setRankings(rankingsPayload);
         }
-        if (isNonEmptyArray<MissionRoute>(data.routes)) {
-          setRoutes(data.routes);
+        if (routesPayload) {
+          setRoutes(routesPayload);
+        }
+
+        if (rankingsPayload && routesPayload) {
+          const { lines, nextPrevious } = buildRankingsUpdateLogLines(
+            rankingsPayload,
+            routesPayload,
+            prevRankerUrgencyRef.current
+          );
+          prevRankerUrgencyRef.current = nextPrevious;
+          appendRankerFeedLogs(lines);
         }
         break;
+      }
 
       case "agent1_complete":
+        appendValuationFeedLogs(
+          buildAgent1CompleteLogLines({
+            valuations_count: Number(data.valuations_count ?? 0),
+            deep_research_count: Number(data.deep_research_count ?? 0),
+            fast_valuation_count: Number(data.fast_valuation_count ?? 0),
+            elapsed_seconds: Number(data.elapsed_seconds ?? 0),
+          })
+        );
         addLog(
           "success",
           "AH-001",
@@ -180,14 +237,17 @@ export function useOrebitWebSocket(url?: string) {
         );
         break;
 
-      case "mission_report":
-        setMissionReport({
+      case "mission_report": {
+        const reportPayload: MissionReportData = {
           asteroid_id: String(data.asteroid_id ?? ""),
           cached: Boolean(data.cached),
           report: (data.report as MissionReportData["report"]) ?? {},
           timestamp: String(data.timestamp ?? ""),
-        });
+        };
+        setMissionReport(reportPayload);
+        appendMissionFeedLogs(buildMissionReportLogLines(reportPayload));
         break;
+      }
 
       case "agent_status": {
         const status: AgentStatus = {
@@ -199,6 +259,12 @@ export function useOrebitWebSocket(url?: string) {
         setAgentStatuses((prev) => ({ ...prev, [status.agent]: status }));
         if (status.agent === "market_feed" && status.message.trim()) {
           appendMarketFeedLogs([formatAgentStatusLine(status.message)]);
+        } else if (status.agent === "targeting" && status.message.trim()) {
+          appendRankerFeedLogs([formatRankerStatusLine(status.message)]);
+        } else if (status.agent === "valuation" && status.message.trim()) {
+          appendValuationFeedLogs([formatValuationStatusLine(status.message)]);
+        } else if (status.agent === "mission_report" && status.message.trim()) {
+          appendMissionFeedLogs([formatMissionStatusLine(status.message)]);
         }
         const logType =
           status.status === "error" ? "error" : status.status === "active" ? "info" : "success";
@@ -223,7 +289,13 @@ export function useOrebitWebSocket(url?: string) {
         );
       }
     }
-  }, [addLog, appendMarketFeedLogs]);
+  }, [
+    addLog,
+    appendMarketFeedLogs,
+    appendRankerFeedLogs,
+    appendValuationFeedLogs,
+    appendMissionFeedLogs,
+  ]);
 
   // WebSocket connection + message routing (reconnect if backend starts after UI)
   useEffect(() => {
@@ -296,6 +368,9 @@ export function useOrebitWebSocket(url?: string) {
   return {
     logs,
     marketFeedLogs,
+    rankerFeedLogs,
+    valuationFeedLogs,
+    missionFeedLogs,
     marketPrices,
     rankings,
     routes,
