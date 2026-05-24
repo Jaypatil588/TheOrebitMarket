@@ -7,7 +7,10 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 	"time"
+
+	"github.com/Jaypatil588/TheOrebitMarket/backend/db"
 )
 
 const (
@@ -251,38 +254,56 @@ func (c *Client) GenerateImage(prompt string) (string, error) {
 }
 
 // GenerateRouteImages generates composition heatmap and surface images for a route
-func (c *Client) GenerateRouteImages(routeLabel string, mineralFocus []string, asteroidNames []string) (heatmapB64, surfaceB64 string, err error) {
-	log.Printf("[GEMINI] GenerateRouteImages: route=%s minerals=%v asteroids=%v", routeLabel, mineralFocus, asteroidNames)
+func (c *Client) GenerateRouteImages(routeLabel string, mineralFocus []string, asteroids []db.AsteroidValuation) (heatmapB64, surfaceB64 string, err error) {
+	log.Printf("[GEMINI] GenerateRouteImages: route=%s minerals=%v asteroids_count=%d", routeLabel, mineralFocus, len(asteroids))
 
-	mineralList := "various minerals"
-	if len(mineralFocus) > 0 {
-		mineralList = fmt.Sprintf("%v", mineralFocus)
-	}
-
-	asteroidList := "multiple asteroids"
-	if len(asteroidNames) > 0 {
-		if len(asteroidNames) > 3 {
-			asteroidList = fmt.Sprintf("%s and %d more", asteroidNames[0], len(asteroidNames)-1)
-		} else {
-			asteroidList = fmt.Sprintf("%v", asteroidNames)
+	var asteroidDetailsStr strings.Builder
+	for _, ast := range asteroids {
+		asteroidDetailsStr.WriteString(fmt.Sprintf("- Asteroid %s (%s-type, Diameter: %.2f km, Mass: %.2e kg):\n", ast.Name, ast.SpecType, ast.DiameterKm, ast.MassKg))
+		
+		// Parse composition percentages
+		var compParts []string
+		for mineral, val := range ast.Composition {
+			if pct, ok := val.(float64); ok {
+				compParts = append(compParts, fmt.Sprintf("%s: %.1f%%", mineral, pct))
+			} else if pctStr, ok := val.(string); ok {
+				compParts = append(compParts, fmt.Sprintf("%s: %s", mineral, pctStr))
+			}
+		}
+		if len(compParts) > 0 {
+			asteroidDetailsStr.WriteString(fmt.Sprintf("  Composition details: %s\n", strings.Join(compParts, ", ")))
 		}
 	}
 
+	mineralList := "various critical minerals"
+	if len(mineralFocus) > 0 {
+		mineralList = strings.Join(mineralFocus, ", ")
+	}
+
 	heatmapPrompt := fmt.Sprintf(
-		"Scientific data visualization heatmap showing mineral composition distribution across asteroid surfaces. "+
-			"Focus minerals: %s. Style: dark space background, false-color thermal imaging aesthetic, "+
-			"glowing data points in amber/blue/cyan colors representing mineral concentrations. "+
-			"Technical scientific visualization for asteroid mining mission planning. "+
-			"No text, no labels, pure abstract data visualization. 4K quality, professional scientific imagery.",
-		mineralList,
+		"Scientific data visualization spectrographic heatmap overlay showing mineral composition distribution and concentration zones across target asteroid surfaces for a space mining operation.\n"+
+			"Target Asteroids:\n%s\n"+
+			"Priority Focus Minerals: %s\n"+
+			"Visual Style:\n"+
+			"- High-contrast false-color thermal and spectral analysis imagery.\n"+
+			"- Deep space black background with a detailed grid overlay.\n"+
+			"- Glowing concentration hotspots in vibrant neon amber, cyan, cobalt blue, and royal violet representing different mineral concentrations.\n"+
+			"- Sleek, futuristic scientific data visualization aesthetic with orbital path lines and telemetric scanning indicators.\n"+
+			"- Pure abstract data display. Absolutely no spelling, random letters, text, or alphabetic labels to ensure scientific visual accuracy.",
+		asteroidDetailsStr.String(), mineralList,
 	)
 
 	surfacePrompt := fmt.Sprintf(
-		"Photorealistic asteroid surface render in deep space. Rocky, cratered terrain with metallic veins "+
-			"containing %s deposits. Dramatic lighting from distant sun, stars visible in black sky background. "+
-			"Cinematic space photography style, NASA-quality imagery. Surface shows mining potential areas "+
-			"with subtle metallic glints. Target asteroids: %s. Ultra-detailed, 4K quality.",
-		mineralList, asteroidList,
+		"Photorealistic high-fidelity asteroid close-up render in deep space, capturing the detailed geological surface of target asteroids with visible resource deposits.\n"+
+			"Target Asteroids:\n%s\n"+
+			"Mineral Deposits: Prominent geological veins, crystalline formations, and metallic glints of %s.\n"+
+			"Visual Style:\n"+
+			"- Stunning, highly detailed rocky and cratered asteroid landscapes.\n"+
+			"- Stark high-contrast lighting cast by a distant bright sun, creating deep, dramatic shadows on the surface craters.\n"+
+			"- Deep space background with a realistic, faint starfield.\n"+
+			"- Cinematic space exploration theme, NASA-quality astrophotography style, octane render aesthetic, 4K quality.\n"+
+			"- No HUD elements, no overlays, and no text labels.",
+		asteroidDetailsStr.String(), mineralList,
 	)
 
 	heatmapB64, err = c.GenerateImage(heatmapPrompt)

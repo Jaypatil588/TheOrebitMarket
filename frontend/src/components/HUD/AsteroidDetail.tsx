@@ -233,7 +233,7 @@ export function AsteroidDetail({ selectedAsteroid, onClose }: AsteroidDetailProp
         animate={{ opacity: 1, x: 0 }}
         exit={{ opacity: 0, x: -40 }}
         transition={{ type: "spring", stiffness: 320, damping: 28 }}
-        className="absolute left-6 bottom-6 w-[360px] z-10 select-none flex flex-col"
+        className="absolute left-6 bottom-6 w-[360px] z-10 select-none flex flex-col pointer-events-auto"
         style={{ maxHeight: "calc(100vh - 6rem)" }}
       >
         <div className="flex flex-col rounded-lg overflow-hidden border border-white/[0.06] bg-black/75 backdrop-blur-xl shadow-[0_0_40px_rgba(0,0,0,0.7)]">

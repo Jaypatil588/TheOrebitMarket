@@ -133,25 +133,29 @@ export function useOrebitWebSocket(url?: string) {
 
   // Initial telemetry logs start empty
 
-  // Fetch initial state from database on mount so we don't wait for WebSocket broadcasts
+  // Initial REST fetch — failures are non-blocking; section components show mock data until live data arrives
   useEffect(() => {
-    // 1. Fetch prices
     fetch(`${BACKEND_URL}/api/prices`)
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
       .then((data) => {
-        if (data && Array.isArray(data.prices)) {
+        if (data && Array.isArray(data.prices) && data.prices.length > 0) {
           setMarketPrices(data.prices);
         }
       })
       .catch((err) => console.warn("[WS REST] Failed to fetch initial prices:", err));
 
-    // 2. Fetch rankings and routes
     fetch(`${BACKEND_URL}/api/rankings`)
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
       .then((data) => {
         if (data) {
-          if (Array.isArray(data.rankings)) setRankings(data.rankings);
-          if (Array.isArray(data.routes)) setRoutes(data.routes);
+          if (Array.isArray(data.rankings) && data.rankings.length > 0) setRankings(data.rankings);
+          if (Array.isArray(data.routes) && data.routes.length > 0) setRoutes(data.routes);
         }
       })
       .catch((err) => console.warn("[WS REST] Failed to fetch initial rankings:", err));

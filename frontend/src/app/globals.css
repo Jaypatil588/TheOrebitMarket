@@ -37,7 +37,7 @@
 }
 
 html {
-  scroll-snap-type: y mandatory;
+  scroll-snap-type: y proximity;
   scroll-behavior: smooth;
 }
 
@@ -64,7 +64,7 @@ html, body {
 }
 
 .snap-section:not(:first-child) {
-  background-color: #000;
+  background-color: transparent;
 }
 
 /* ── Glass Card System ───────────────────────────── */

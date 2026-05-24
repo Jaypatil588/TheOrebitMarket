@@ -77,8 +77,8 @@ export default function Home() {
         />
       </div>
 
-      {/* Hero section with transparent overlay */}
-      <section className="snap-section relative h-screen z-10">
+      {/* Hero section — pointer-events-none so clicks reach the 3D canvas below */}
+      <section className="snap-section relative h-screen z-10 pointer-events-none">
         <HeroOverlay />
         <AsteroidDetail
           selectedAsteroid={selectedAsteroid}

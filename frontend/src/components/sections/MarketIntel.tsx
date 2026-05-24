@@ -82,17 +82,18 @@ export function MarketIntel({
   const sectionRef = useRef<HTMLDivElement>(null);
   const isInView = useInView(sectionRef, { once: true, margin: "-100px" });
 
-  if (!prices || prices.length === 0) return null;
+  const hasData = prices && prices.length > 0;
+  const activePrices = hasData ? prices : MOCK_PRICES;
 
   const isLive = true;
 
   // Show top 6 by urgency for the grid cards
-  const displayPrices = [...prices]
+  const displayPrices = [...activePrices]
     .sort((a, b) => b.urgency - a.urgency)
     .slice(0, 6);
 
   // Show disruptions for the alerts panel
-  const alerts = prices
+  const alerts = activePrices
     .filter((p) => p.disruption || p.scenario_adjusted)
     .sort((a, b) => b.urgency - a.urgency)
     .slice(0, 5);
@@ -101,7 +102,7 @@ export function MarketIntel({
     <section
       ref={sectionRef}
       className="snap-section relative z-10 flex flex-col items-center justify-center px-8"
-      style={{ background: "rgba(0, 0, 0, 0.88)" }}
+      style={{ background: "transparent" }}
     >
       <div className="w-full max-w-[1100px]">
         {/* Header */}
@@ -120,9 +121,9 @@ export function MarketIntel({
             </h2>
             {isLive && (
               <span className="flex items-center gap-1.5 text-xs font-mono uppercase tracking-wider px-2 py-1 rounded"
-                style={{ background: "rgba(52,211,153,0.1)", color: "var(--positive)" }}>
-                <div className="w-1.5 h-1.5 rounded-full pulse-active" style={{ background: "var(--positive)" }} />
-                LIVE
+                style={{ background: hasData ? "rgba(52,211,153,0.1)" : "rgba(251,191,36,0.1)", color: hasData ? "var(--positive)" : "var(--warning)" }}>
+                <div className="w-1.5 h-1.5 rounded-full pulse-active" style={{ background: hasData ? "var(--positive)" : "var(--warning)" }} />
+                {hasData ? "LIVE" : "SIMULATED"}
               </span>
             )}
           </div>
@@ -264,7 +265,7 @@ export function MarketIntel({
           style={{ color: "var(--dust-dim)" }}
         >
           {isLive
-            ? `Live data — ${prices.length} minerals tracked · Refreshes every 10s via Agent 2`
+            ? `${hasData ? "Live" : "Simulated"} data — ${activePrices.length} minerals tracked · Refreshes every 10s via Agent 2`
             : null}
         </motion.p>
       </div>

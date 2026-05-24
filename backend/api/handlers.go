@@ -368,19 +368,35 @@ func (a *API) PostRouteImagesHandler(w http.ResponseWriter, r *http.Request) {
 		routeLabel = req.RouteID
 	}
 
-	var asteroidNames []string
+	var asteroids []db.AsteroidValuation
 	for _, id := range req.AsteroidIDs {
-		for _, ast := range ranking.Rankings {
-			if ast.AsteroidID == id {
-				asteroidNames = append(asteroidNames, ast.Name)
-				break
+		val, err := a.store.GetAsteroidValuation(id)
+		if err == nil && val != nil {
+			asteroids = append(asteroids, *val)
+		} else {
+			// Fallback: build a minimal structure from strategic rankings
+			var name, spec string
+			for _, ast := range ranking.Rankings {
+				if ast.AsteroidID == id {
+					name = ast.Name
+					spec = ast.SpecType
+					break
+				}
 			}
+			if name == "" {
+				name = id
+			}
+			asteroids = append(asteroids, db.AsteroidValuation{
+				ID:       id,
+				Name:     name,
+				SpecType: spec,
+			})
 		}
 	}
 
-	log.Printf("[API] Generating route images: route=%s minerals=%v asteroids=%v", routeLabel, mineralFocus, asteroidNames)
+	log.Printf("[API] Generating route images: route=%s minerals=%v asteroids_count=%d", routeLabel, mineralFocus, len(asteroids))
 
-	heatmapB64, surfaceB64, err := a.gemini.GenerateRouteImages(routeLabel, mineralFocus, asteroidNames)
+	heatmapB64, surfaceB64, err := a.gemini.GenerateRouteImages(routeLabel, mineralFocus, asteroids)
 	if err != nil {
 		log.Printf("[API] Image generation failed: %v", err)
 		w.Header().Set("Content-Type", "application/json")

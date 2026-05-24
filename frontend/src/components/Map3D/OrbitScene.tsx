@@ -152,7 +152,14 @@ function SceneContent({
           receiveShadow: Earth can receive shadows from asteroids (has no visual
             effect since the Earth shader manages its own lighting internally,
             but keeps the flag consistent for future material changes).           */}
-      <EarthSystem />
+      <Suspense fallback={
+        <mesh position={[-6, 4, 5]}>
+          <icosahedronGeometry args={[5.0, 16]} />
+          <meshBasicMaterial color="#0d52ab" wireframe transparent opacity={0.4} />
+        </mesh>
+      }>
+        <EarthSystem />
+      </Suspense>
 
       <OrbitPaths
         radii={orbitRadii}
