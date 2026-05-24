@@ -19,6 +19,8 @@ const (
 	Model             = "gemini-3.5-flash"
 	AgentAntigravity  = "antigravity"
 	AgentDeepResearch = "deep-research-preview-04-2026"
+	// May 2026 Interactions API schema (steps[] instead of top-level output_text)
+	APIRevision = "2026-05-20"
 )
 
 // Client wraps the Gemini Interactions API
@@ -63,6 +65,247 @@ type InteractionResponse struct {
 	} `json:"usage"`
 }
 
+type interactionContent struct {
+	Type string `json:"type"`
+	Text string `json:"text"`
+}
+
+type interactionStepRaw struct {
+	Type    string          `json:"type"`
+	Content json.RawMessage `json:"content"`
+	Text    string          `json:"text"`
+}
+
+type interactionOutput struct {
+	Type string `json:"type"`
+	Text string `json:"text"`
+}
+
+// interactionRaw captures both legacy and May 2026 Interactions API response shapes.
+type interactionRaw struct {
+	OutputText  string               `json:"output_text"`
+	Steps       []interactionStepRaw `json:"steps"`
+	Outputs     []interactionOutput  `json:"outputs"`
+	Interaction *interactionRaw      `json:"interaction"`
+}
+
+// parseInteractionResponse extracts model text from output_text, steps[], or legacy outputs[].
+// REST responses do not populate output_text (SDK-only sugar); text lives under steps or outputs.
+func parseInteractionResponse(respBytes []byte) (*InteractionResponse, error) {
+	payload := unwrapInteractionPayload(respBytes)
+
+	var raw interactionRaw
+	if err := json.Unmarshal(payload, &raw); err != nil {
+		return nil, fmt.Errorf("unmarshal: %w", err)
+	}
+
+	text := strings.TrimSpace(raw.OutputText)
+	if text == "" {
+		text = extractTextFromSteps(raw.Steps)
+	}
+	if text == "" {
+		text = extractTextFromOutputs(raw.Outputs)
+	}
+	if text == "" {
+		text = extractTextRecursive(json.RawMessage(payload))
+	}
+
+	var result InteractionResponse
+	_ = json.Unmarshal(payload, &result)
+	result.OutputText = text
+	return &result, nil
+}
+
+// unwrapInteractionPayload returns the interaction object if the body is wrapped.
+func unwrapInteractionPayload(respBytes []byte) []byte {
+	var wrap struct {
+		Interaction json.RawMessage `json:"interaction"`
+	}
+	if err := json.Unmarshal(respBytes, &wrap); err == nil && len(wrap.Interaction) > 0 {
+		return wrap.Interaction
+	}
+	return respBytes
+}
+
+func extractTextFromSteps(steps []interactionStepRaw) string {
+	var last string
+	for _, step := range steps {
+		if step.Type != "model_output" {
+			continue
+		}
+		if t := strings.TrimSpace(step.Text); t != "" {
+			last = t
+			continue
+		}
+		if t := extractTextFromContentRaw(step.Content); t != "" {
+			last = t
+		}
+	}
+	return last
+}
+
+func extractTextFromContentRaw(raw json.RawMessage) string {
+	if len(raw) == 0 || string(raw) == "null" {
+		return ""
+	}
+
+	var items []interactionContent
+	if err := json.Unmarshal(raw, &items); err == nil {
+		return joinTextContent(items)
+	}
+
+	var one interactionContent
+	if err := json.Unmarshal(raw, &one); err == nil {
+		return joinTextContent([]interactionContent{one})
+	}
+
+	// Thought summaries and other nested content blocks.
+	var nested map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &nested); err == nil {
+		if summary, ok := nested["summary"]; ok {
+			if t := extractTextFromContentRaw(summary); t != "" {
+				return t
+			}
+		}
+		if content, ok := nested["content"]; ok {
+			if t := extractTextFromContentRaw(content); t != "" {
+				return t
+			}
+		}
+	}
+
+	return extractTextRecursive(raw)
+}
+
+func joinTextContent(items []interactionContent) string {
+	var parts []string
+	for _, c := range items {
+		if strings.TrimSpace(c.Text) == "" {
+			continue
+		}
+		if c.Type == "text" || c.Type == "" {
+			parts = append(parts, c.Text)
+		}
+	}
+	return strings.TrimSpace(strings.Join(parts, ""))
+}
+
+func extractTextFromOutputs(outputs []interactionOutput) string {
+	var last string
+	for _, o := range outputs {
+		if (o.Type == "text" || o.Type == "") && strings.TrimSpace(o.Text) != "" {
+			last = strings.TrimSpace(o.Text)
+		}
+	}
+	return last
+}
+
+// extractTextRecursive walks arbitrary JSON for text blocks (last-resort extraction).
+func extractTextRecursive(raw json.RawMessage) string {
+	var v interface{}
+	if err := json.Unmarshal(raw, &v); err != nil {
+		return ""
+	}
+	var candidates []string
+	collectTextValues(v, &candidates)
+	if len(candidates) == 0 {
+		return ""
+	}
+	return strings.TrimSpace(candidates[len(candidates)-1])
+}
+
+func collectTextValues(v interface{}, out *[]string) {
+	switch x := v.(type) {
+	case map[string]interface{}:
+		if t, ok := x["text"].(string); ok && strings.TrimSpace(t) != "" {
+			if typ, _ := x["type"].(string); typ == "text" || typ == "" {
+				*out = append(*out, t)
+			}
+		}
+		for _, child := range x {
+			collectTextValues(child, out)
+		}
+	case []interface{}:
+		for _, item := range x {
+			collectTextValues(item, out)
+		}
+	}
+}
+
+// logInteractionStructure logs response shape when model text could not be extracted.
+func logInteractionStructure(respBytes []byte, context string) {
+	payload := unwrapInteractionPayload(respBytes)
+
+	var top map[string]json.RawMessage
+	if err := json.Unmarshal(payload, &top); err != nil {
+		log.Printf("[GEMINI] WARN: %s | body_len=%d | invalid JSON: %v", context, len(respBytes), err)
+		return
+	}
+
+	keys := make([]string, 0, len(top))
+	for k := range top {
+		keys = append(keys, k)
+	}
+
+	status := ""
+	if s, ok := top["status"]; ok {
+		_ = json.Unmarshal(s, &status)
+	}
+
+	stepTypes := summarizeStepTypes(top["steps"])
+	outputTypes := summarizeOutputTypes(top["outputs"])
+
+	snippet := string(payload)
+	if len(snippet) > 600 {
+		snippet = snippet[:600] + "…"
+	}
+
+	log.Printf("[GEMINI] WARN: %s | body_len=%d | keys=%v | status=%q | step_types=%s | output_types=%s",
+		context, len(respBytes), keys, status, stepTypes, outputTypes)
+	log.Printf("[GEMINI] WARN: response_snippet=%s", snippet)
+}
+
+func summarizeStepTypes(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return "none"
+	}
+	var steps []interactionStepRaw
+	if err := json.Unmarshal(raw, &steps); err != nil {
+		return "unmarshal_error"
+	}
+	counts := make(map[string]int)
+	for _, s := range steps {
+		counts[s.Type]++
+	}
+	return formatTypeCounts(counts)
+}
+
+func summarizeOutputTypes(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return "none"
+	}
+	var outputs []interactionOutput
+	if err := json.Unmarshal(raw, &outputs); err != nil {
+		return "unmarshal_error"
+	}
+	counts := make(map[string]int)
+	for _, o := range outputs {
+		counts[o.Type]++
+	}
+	return formatTypeCounts(counts)
+}
+
+func formatTypeCounts(counts map[string]int) string {
+	if len(counts) == 0 {
+		return "empty"
+	}
+	parts := make([]string, 0, len(counts))
+	for k, n := range counts {
+		parts = append(parts, fmt.Sprintf("%s:%d", k, n))
+	}
+	return strings.Join(parts, ", ")
+}
+
 // NewClient creates a Gemini API client
 func NewClient(apiKey string) *Client {
 	return &Client{
@@ -97,14 +340,18 @@ func (c *Client) interactSync(input string) (*InteractionResponse, error) {
 		return nil, err
 	}
 
-	var result InteractionResponse
-	if err := json.Unmarshal(respBytes, &result); err != nil {
-		return nil, fmt.Errorf("unmarshal: %w", err)
+	result, err := parseInteractionResponse(respBytes)
+	if err != nil {
+		return nil, err
 	}
 
 	log.Printf("[GEMINI] sync done | output_len=%d", len(result.OutputText))
-	log.Printf("[GEMINI] Raw output (first 300 chars): %.300s", result.OutputText)
-	return &result, nil
+	if len(result.OutputText) == 0 {
+		logInteractionStructure(respBytes, "empty sync output after parsing steps/outputs")
+	} else {
+		log.Printf("[GEMINI] Raw output (first 300 chars): %.300s", result.OutputText)
+	}
+	return result, nil
 }
 
 // interactAsync starts a background interaction and polls until completed or failed.
@@ -131,6 +378,7 @@ func (c *Client) interactAsync(agent, input string) (*InteractionResponse, error
 		if err != nil {
 			return nil, err
 		}
+		req.Header.Set("Api-Revision", APIRevision)
 
 		resp, err := c.HTTP.Do(req)
 		if err != nil {
@@ -152,9 +400,17 @@ func (c *Client) interactAsync(agent, input string) (*InteractionResponse, error
 
 		switch poll.Status {
 		case "completed":
-			log.Printf("[GEMINI] async done | output_len=%d", len(poll.OutputText))
-			log.Printf("[GEMINI] Raw output (first 300 chars): %.300s", poll.OutputText)
-			return &InteractionResponse{OutputText: poll.OutputText}, nil
+			result, err := parseInteractionResponse(pollBytes)
+			if err != nil {
+				return nil, err
+			}
+			log.Printf("[GEMINI] async done | output_len=%d", len(result.OutputText))
+			if len(result.OutputText) == 0 {
+				logInteractionStructure(pollBytes, "empty async output after parsing steps/outputs")
+			} else {
+				log.Printf("[GEMINI] Raw output (first 300 chars): %.300s", result.OutputText)
+			}
+			return result, nil
 		case "failed":
 			return nil, fmt.Errorf("deep-research failed: %s", poll.Error)
 		}
@@ -169,6 +425,7 @@ func (c *Client) post(url string, body []byte) ([]byte, error) {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Api-Revision", APIRevision)
 
 	log.Printf("[GEMINI] POST %s", url)
 	resp, err := c.HTTP.Do(req)

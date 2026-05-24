@@ -1,111 +1,33 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { formatTelemetryTime } from "@/lib/utils";
 import { BACKEND_URL } from "@/lib/config";
+import {
+  hasLivePrices,
+  hasLiveRankings,
+  hasLiveRoutes,
+  isNonEmptyArray,
+} from "@/lib/liveData";
 
-// ── Log entries (telemetry feed) ──────────────────────────────────────────────
-export interface LogEntry {
-  id: string;
-  timestamp: string;
-  type: "info" | "success" | "warning" | "error" | "telemetry" | "discovery";
-  agentId: string;
-  message: string;
-  meta?: unknown;
-}
+export type {
+  LogEntry,
+  MarketPrice,
+  RankedAsteroid,
+  RouteStop,
+  RouteTotals,
+  MissionRoute,
+  AgentStatus,
+  MissionReportData,
+  Scenario,
+} from "@/types/orebit";
 
-// ── Live market data from Agent 2 ─────────────────────────────────────────────
-export interface MarketPrice {
-  mineral: string;
-  price_usd: number;
-  trend: string;
-  change_pct: number;
-  urgency: number;
-  disruption: string;
-  source_url: string;
-  category: string;
-  criticality: number;
-  scenario_adjusted: boolean;
-  fetched_at: string;
-}
-
-// ── Strategic rankings from Agent 3 ──────────────────────────────────────────
-export interface RankedAsteroid {
-  rank: number;
-  asteroid_id: string;
-  name: string;
-  spec_type: string;
-  composite_score: number;
-  net_value_usd: number;
-  roi: number;
-  top_mineral: string;
-  mineral_urgency: number;
-  delta_v_km_s: number;
-  launch_window_year: number;
-  confidence: number;
-  scenario_boosted: boolean;
-  reasoning: string;
-  trend: string;
-}
-
-export interface RouteStop {
-  order: number;
-  body: string;
-  asteroid_id?: string;
-  mineral_target?: string;
-  extractable_value_usd?: number;
-  stay_duration_days?: number;
-  delta_v_to_next_km_s: number;
-  departure_year?: number;
-}
-
-export interface RouteTotals {
-  total_value_usd: number;
-  total_cost_usd: number;
-  net_return_usd: number;
-  roi_pct: number;
-  duration_years: number;
-  total_delta_v_km_s: number;
-  minerals_covered: string[];
-}
-
-export interface MissionRoute {
-  id: string;
-  label: string;
-  color_hex: string;
-  urgency_score: number;
-  urgency_reason: string;
-  mineral_focus: string[];
-  is_default: boolean;
-  scenario_driven: boolean;
-  stops: RouteStop[];
-  totals: RouteTotals;
-  route_reasoning: string;
-}
-
-// ── Agent status from any agent broadcast ────────────────────────────────────
-export interface AgentStatus {
-  agent: string;
-  status: string;
-  message: string;
-  asteroid_id?: string;
-}
-
-// ── Mission report from Agent 4 ───────────────────────────────────────────────
-export interface MissionReportData {
-  asteroid_id: string;
-  cached: boolean;
-  report: Record<string, unknown>;
-  timestamp: string;
-}
-
-// ── Scenario ──────────────────────────────────────────────────────────────────
-export interface Scenario {
-  id: string;
-  description: string;
-  affected_minerals: string[];
-  severity: number;
-  active: boolean;
-  created_at: string;
-}
+import type {
+  LogEntry,
+  MarketPrice,
+  RankedAsteroid,
+  MissionRoute,
+  AgentStatus,
+  MissionReportData,
+} from "@/types/orebit";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -133,32 +55,50 @@ export function useOrebitWebSocket(url?: string) {
 
   // Initial telemetry logs start empty
 
-  // Initial REST fetch — failures are non-blocking; section components show mock data until live data arrives
+  // REST bootstrap before / alongside WebSocket — only non-empty payloads replace state
   useEffect(() => {
-    fetch(`${BACKEND_URL}/api/prices`)
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
-      })
-      .then((data) => {
-        if (data && Array.isArray(data.prices) && data.prices.length > 0) {
-          setMarketPrices(data.prices);
-        }
-      })
-      .catch((err) => console.warn("[WS REST] Failed to fetch initial prices:", err));
+    let cancelled = false;
 
-    fetch(`${BACKEND_URL}/api/rankings`)
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
-      })
-      .then((data) => {
-        if (data) {
-          if (Array.isArray(data.rankings) && data.rankings.length > 0) setRankings(data.rankings);
-          if (Array.isArray(data.routes) && data.routes.length > 0) setRoutes(data.routes);
+    const loadBootstrap = async () => {
+      const [pricesResult, rankingsResult] = await Promise.allSettled([
+        fetch(`${BACKEND_URL}/api/prices`).then(async (res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.json();
+        }),
+        fetch(`${BACKEND_URL}/api/rankings`).then(async (res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.json();
+        }),
+      ]);
+
+      if (cancelled) return;
+
+      if (pricesResult.status === "fulfilled") {
+        const prices = pricesResult.value?.prices;
+        if (isNonEmptyArray<MarketPrice>(prices)) {
+          setMarketPrices(prices);
         }
-      })
-      .catch((err) => console.warn("[WS REST] Failed to fetch initial rankings:", err));
+      } else {
+        console.warn("[REST] Failed to fetch initial prices:", pricesResult.reason);
+      }
+
+      if (rankingsResult.status === "fulfilled") {
+        const data = rankingsResult.value;
+        if (isNonEmptyArray<RankedAsteroid>(data?.rankings)) {
+          setRankings(data.rankings);
+        }
+        if (isNonEmptyArray<MissionRoute>(data?.routes)) {
+          setRoutes(data.routes);
+        }
+      } else {
+        console.warn("[REST] Failed to fetch initial rankings:", rankingsResult.reason);
+      }
+    };
+
+    void loadBootstrap();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // WebSocket connection + message routing
@@ -193,14 +133,18 @@ export function useOrebitWebSocket(url?: string) {
 
         switch (data.type) {
           case "market_update":
-            if (Array.isArray(data.prices)) {
+            if (isNonEmptyArray<MarketPrice>(data.prices)) {
               setMarketPrices(data.prices);
             }
             break;
 
           case "rankings_update":
-            if (Array.isArray(data.rankings)) setRankings(data.rankings);
-            if (Array.isArray(data.routes)) setRoutes(data.routes);
+            if (isNonEmptyArray<RankedAsteroid>(data.rankings)) {
+              setRankings(data.rankings);
+            }
+            if (isNonEmptyArray<MissionRoute>(data.routes)) {
+              setRoutes(data.routes);
+            }
             break;
 
           case "agent1_complete":
@@ -272,6 +216,9 @@ export function useOrebitWebSocket(url?: string) {
     agentStatuses,
     missionReport,
     connected,
+    hasLivePrices: hasLivePrices(marketPrices),
+    hasLiveRankings: hasLiveRankings(rankings),
+    hasLiveRoutes: hasLiveRoutes(routes),
     addManualLog,
   };
 }

@@ -193,7 +193,30 @@ func (a *Agent) Run() {
 
 	totalValuations := 0
 
-	// Step 5: Process top candidates with Gemini Deep Research
+	// Step 5: Fast deterministic valuation first — unblocks Agent 3 while deep research polls
+	if len(remainingAsteroids) > 0 {
+		log.Printf("[AGENT1] ── Fast valuation for %d remaining asteroids ──", len(remainingAsteroids))
+		a.broadcastStatus("active", fmt.Sprintf("Fast valuation for %d remaining asteroids...", len(remainingAsteroids)))
+
+		for _, sc := range remainingAsteroids {
+			v := deterministicValuation(sc.Asteroid, priceMap, scenarios)
+			v.ResearchSummary = "Fast deterministic valuation — not in top market-aligned candidates."
+			if err := a.db.UpsertAsteroidValuation(v); err != nil {
+				log.Printf("[AGENT1] ERROR: DB upsert failed for %s: %v", v.ID, err)
+				a.broadcastStatus("error", fmt.Sprintf("DB upsert failed: %v", err))
+				return
+			}
+		}
+		totalValuations += len(remainingAsteroids)
+		log.Printf("[AGENT1] Fast valuation complete: %d asteroids", len(remainingAsteroids))
+	}
+
+	if totalValuations > 0 {
+		log.Println("[AGENT1] Fast valuations saved → triggering Agent 3 (ranker) before deep research")
+		go a.onComplete()
+	}
+
+	// Step 6: Deep research on top candidates (may take minutes via async poll)
 	if len(topCandidates) > 0 {
 		topAsteroids := make([]engine.Asteroid, len(topCandidates))
 		for i, sc := range topCandidates {
@@ -215,61 +238,42 @@ func (a *Agent) Run() {
 		log.Printf("[AGENT1] Calling Gemini Deep Research | prompt_len=%d", len(prompt))
 		resp, err := a.gemini.Interact(gemini.AgentDeepResearch, systemInstruction, prompt)
 		if err != nil {
-			log.Printf("[AGENT1] ERROR: Gemini Deep Research failed: %v", err)
-			a.broadcastStatus("error", fmt.Sprintf("Gemini Deep Research failed: %v", err))
-			return
-		}
+			log.Printf("[AGENT1] WARN: Gemini Deep Research failed: %v — continuing with fast valuations only", err)
+			a.broadcastStatus("active", fmt.Sprintf("Deep research pending: %v. Ranker already has fast valuations.", err))
+		} else {
 
-		log.Printf("[AGENT1] Deep Research response len=%d", len(resp.OutputText))
-		log.Printf("[AGENT1] Deep Research output:\n%.3000s", resp.OutputText)
+			log.Printf("[AGENT1] Deep Research response len=%d", len(resp.OutputText))
+			log.Printf("[AGENT1] Deep Research output:\n%.3000s", resp.OutputText)
 
-		cleaned := stripJSON(resp.OutputText)
-		var batchResult []db.AsteroidValuation
-		if err := json.Unmarshal([]byte(cleaned), &batchResult); err != nil {
-			log.Printf("[AGENT1] ERROR: Failed to parse Gemini response: %v", err)
-			log.Printf("[AGENT1] Raw response was: %s", cleaned)
-			a.broadcastStatus("error", fmt.Sprintf("Failed to parse Gemini response: %v", err))
-			return
-		}
-
-		log.Printf("[AGENT1] Deep Research: parsed %d valuations", len(batchResult))
-		for _, v := range batchResult {
-			netVal := 0.0
-			if v.Valuation != nil {
-				if nv, ok := v.Valuation["net_value_usd"]; ok {
-					netVal, _ = nv.(float64)
+			cleaned := stripJSON(resp.OutputText)
+			var batchResult []db.AsteroidValuation
+			if err := json.Unmarshal([]byte(cleaned), &batchResult); err != nil {
+				log.Printf("[AGENT1] WARN: Failed to parse Gemini response: %v", err)
+				log.Printf("[AGENT1] Raw response was: %s", cleaned)
+				a.broadcastStatus("active", fmt.Sprintf("Deep research parse pending — ranker using fast valuations"))
+			} else {
+				log.Printf("[AGENT1] Deep Research: parsed %d valuations", len(batchResult))
+				for _, v := range batchResult {
+					netVal := 0.0
+					if v.Valuation != nil {
+						if nv, ok := v.Valuation["net_value_usd"]; ok {
+							netVal, _ = nv.(float64)
+						}
+					}
+					log.Printf("[AGENT1]   [DEEP] %-20s spec=%-2s val=$%.2e conf=%.2f impact=%.1f%%",
+						v.Name, v.SpecType, netVal,
+						safeFloat(v.Risk, "composition_confidence"), v.ScenarioImpact)
 				}
-			}
-			log.Printf("[AGENT1]   [DEEP] %-20s spec=%-2s val=$%.2e conf=%.2f impact=%.1f%%",
-				v.Name, v.SpecType, netVal,
-				safeFloat(v.Risk, "composition_confidence"), v.ScenarioImpact)
-		}
-		for _, v := range batchResult {
-			if err := a.db.UpsertAsteroidValuation(v); err != nil {
-				log.Printf("[AGENT1] ERROR: DB upsert failed for %s: %v", v.ID, err)
-				a.broadcastStatus("error", fmt.Sprintf("DB upsert failed: %v", err))
-				return
+				for _, v := range batchResult {
+					if err := a.db.UpsertAsteroidValuation(v); err != nil {
+						log.Printf("[AGENT1] ERROR: DB upsert failed for %s: %v", v.ID, err)
+						a.broadcastStatus("error", fmt.Sprintf("DB upsert failed: %v", err))
+						return
+					}
+				}
+				totalValuations += len(batchResult)
 			}
 		}
-		totalValuations += len(batchResult)
-	}
-
-	// Step 6: Fast deterministic valuation for remaining asteroids
-	if len(remainingAsteroids) > 0 {
-		log.Printf("[AGENT1] ── Fast valuation for %d remaining asteroids ──", len(remainingAsteroids))
-		a.broadcastStatus("active", fmt.Sprintf("Fast valuation for %d remaining asteroids...", len(remainingAsteroids)))
-
-		for _, sc := range remainingAsteroids {
-			v := deterministicValuation(sc.Asteroid, priceMap, scenarios)
-			v.ResearchSummary = "Fast deterministic valuation — not in top market-aligned candidates."
-			if err := a.db.UpsertAsteroidValuation(v); err != nil {
-				log.Printf("[AGENT1] ERROR: DB upsert failed for %s: %v", v.ID, err)
-				a.broadcastStatus("error", fmt.Sprintf("DB upsert failed: %v", err))
-				return
-			}
-		}
-		totalValuations += len(remainingAsteroids)
-		log.Printf("[AGENT1] Fast valuation complete: %d asteroids", len(remainingAsteroids))
 	}
 
 	// Step 7: broadcast completion

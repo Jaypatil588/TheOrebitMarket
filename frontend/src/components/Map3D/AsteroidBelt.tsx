@@ -1,6 +1,7 @@
 import { useRef, useMemo, useState, useEffect } from "react";
 import { useFrame, useLoader } from "@react-three/fiber";
 import * as THREE from "three";
+import { applyMockRouteCameraFacingAngle } from "@/lib/mockRoutePlacement";
 
 export interface AsteroidData {
   id: string;
@@ -26,6 +27,11 @@ interface AsteroidBeltProps {
   selectedAsteroid: AsteroidData | null;
   onSelectAsteroid: (asteroid: AsteroidData | null) => void;
   onHoverRing: (ringIndex: number | null) => void;
+  /** When true, Psyche/Pallas (mock route stops) start on the camera-facing belt arc. */
+  mockRoutePlacement?: boolean;
+  /** Asteroid IDs on the active mission route — highlighted with routeColor. */
+  routedAsteroidIds?: string[];
+  routeColor?: string;
 }
 
 // Orbit center — centered with Earth
@@ -38,6 +44,9 @@ export function AsteroidBelt({
   selectedAsteroid,
   onSelectAsteroid,
   onHoverRing,
+  mockRoutePlacement = false,
+  routedAsteroidIds = [],
+  routeColor = "#22d3ee",
 }: AsteroidBeltProps) {
   // Load standard basalt textures
   const [colorMap, normalMap] = useLoader(THREE.TextureLoader, [
@@ -90,18 +99,21 @@ export function AsteroidBelt({
 
         // Map elements into initial 3D positions with linear visual sizes
         const loaded = data.map((ast) => {
-          const radius = radii[ast.ringIndex] || 6.0;
-          const d = ast.diameter_km !== undefined ? ast.diameter_km : (ast.DiameterKm !== undefined ? ast.DiameterKm : 1.0);
+          const placed = mockRoutePlacement
+            ? applyMockRouteCameraFacingAngle(ast)
+            : ast;
+          const radius = radii[placed.ringIndex] || 6.0;
+          const d = placed.diameter_km !== undefined ? placed.diameter_km : (placed.DiameterKm !== undefined ? placed.DiameterKm : 1.0);
 
           // Pure linear min-max scaling (no logarithmic compression)
           const linearSize = minSize + ((d - minD) / (maxD - minD)) * (maxSize - minSize);
 
           return {
-            ...ast,
+            ...placed,
             size: linearSize,
-            x: CENTER_X + Math.cos(ast.angle) * radius,
+            x: CENTER_X + Math.cos(placed.angle) * radius,
             y: CENTER_Y,
-            z: CENTER_Z + Math.sin(ast.angle) * radius,
+            z: CENTER_Z + Math.sin(placed.angle) * radius,
           };
         });
         anglesRef.current = loaded.map((a) => a.angle);
@@ -110,7 +122,7 @@ export function AsteroidBelt({
       .catch((err) => {
         console.error("[AsteroidBelt] Error fetching dataset:", err);
       });
-  }, [radii]);
+  }, [radii, mockRoutePlacement]);
 
   // Generate unique deformed low-poly geometries for each asteroid to look like craggy rocks in space
   const deformedGeometries = useMemo(() => {
@@ -180,11 +192,14 @@ export function AsteroidBelt({
     });
   });
 
+  const routedIdSet = useMemo(() => new Set(routedAsteroidIds), [routedAsteroidIds]);
+
   return (
     <group>
       {asteroids.map((ast, index) => {
         const isSelected = selectedAsteroid?.id === ast.id;
         const isHovered = hoveredAsteroidId === ast.id;
+        const isRouted = routedIdSet.has(ast.id);
         const geo = deformedGeometries[index];
         if (!geo) return null;
 
@@ -214,6 +229,8 @@ export function AsteroidBelt({
           rockColor = "#3b82f6"; // Selected bright celestial blue highlight
         } else if (isHovered) {
           rockColor = "#cbd5e1"; // Hover bright slate highlight
+        } else if (isRouted) {
+          rockColor = routeColor;
         } else {
           switch (spec) {
             case "C": // Carbonaceous
@@ -233,7 +250,7 @@ export function AsteroidBelt({
         const currentRadius = radii[ast.ringIndex] || 6.0;
         const colorProximity = Math.max(0, Math.min(1, (18.25 - currentRadius) / (18.25 - 6.0)));
         const finalColor = new THREE.Color(rockColor);
-        if (!isSelected && !isHovered) {
+        if (!isSelected && !isHovered && !isRouted) {
           // Increase lightness of channels up to 0.25 (25% boost) for inner rings
           const colorBoost = colorProximity * 0.25;
           finalColor.r = Math.min(1, finalColor.r + colorBoost);
@@ -269,14 +286,14 @@ export function AsteroidBelt({
               />
             </mesh>
 
-            {/* Selector orbit rings */}
-            {(isHovered || isSelected) && (
+            {/* Route / selector orbit rings */}
+            {(isRouted || isHovered || isSelected) && (
               <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]}>
                 <ringGeometry args={[ast.size * 1.5, ast.size * 1.7, 32]} />
                 <meshBasicMaterial
-                  color={isSelected ? "#3b82f6" : "#ffffff"}
+                  color={isSelected ? "#3b82f6" : isHovered ? "#ffffff" : routeColor}
                   transparent={true}
-                  opacity={isSelected ? 0.7 : 0.3}
+                  opacity={isSelected ? 0.7 : isHovered ? 0.3 : 0.55}
                   side={THREE.DoubleSide}
                 />
               </mesh>

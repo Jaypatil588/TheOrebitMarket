@@ -1,6 +1,10 @@
 import { useEffect, useRef } from "react";
 import { useThree, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import {
+  DEFAULT_CAMERA_LOOK_AT,
+  DEFAULT_CAMERA_POSITION,
+} from "@/lib/mockRoutePlacement";
 
 interface AsteroidPosition {
   id: string;
@@ -9,35 +13,35 @@ interface AsteroidPosition {
   z: number;
 }
 
+const EARTH_POS = new THREE.Vector3(-6, 4, 5);
+const DEFAULT_POS = new THREE.Vector3(...DEFAULT_CAMERA_POSITION);
+const DEFAULT_LOOK = new THREE.Vector3(...DEFAULT_CAMERA_LOOK_AT);
+
 export function useCameraControls(selectedAsteroid: AsteroidPosition | null) {
   const { camera, scene } = useThree();
 
-  // Camera defaults — elevated view with Earth half-visible in top-left, belt below
-  const originalPosition = useRef(new THREE.Vector3(3, 8, 16));
-  const targetPosition = useRef(new THREE.Vector3(3, 10, 16));
+  const targetPosition = useRef(DEFAULT_POS.clone());
+  const lookAtTarget = useRef(DEFAULT_LOOK.clone());
+  const targetLookAt = useRef(DEFAULT_LOOK.clone());
 
-  // Look downward so the asteroid belt falls below camera horizon
-  const lookAtTarget = useRef(new THREE.Vector3(2, 1, 2));
-  const targetLookAt = useRef(new THREE.Vector3(2, 1, 2));
+  const selectionTargetRef = useRef<THREE.Object3D | null>(null);
+  const livePosScratch = useRef(new THREE.Vector3());
 
-  // Cache the live 3D object to avoid expensive scene graph queries on every frame
-  const liveTargetRef = useRef<THREE.Object3D | null>(null);
-
-  // Handle selected asteroid changes (resets to initial positions or global view)
   useEffect(() => {
     if (selectedAsteroid) {
-      // Find the object ONCE when selection changes and cache it
-      liveTargetRef.current = scene.getObjectByName(`asteroid-${selectedAsteroid.id}`) || null;
+      selectionTargetRef.current =
+        scene.getObjectByName(`asteroid-${selectedAsteroid.id}`) || null;
 
-      // Earth position matching EarthSystem.tsx
-      const earthPos = new THREE.Vector3(-6, 4, 5);
-      const asteroidPos = new THREE.Vector3(selectedAsteroid.x, selectedAsteroid.y, selectedAsteroid.z);
-      const dir = new THREE.Vector3().subVectors(asteroidPos, earthPos).normalize();
-      
+      const asteroidPos = new THREE.Vector3(
+        selectedAsteroid.x,
+        selectedAsteroid.y,
+        selectedAsteroid.z
+      );
+      const dir = new THREE.Vector3().subVectors(asteroidPos, EARTH_POS).normalize();
+
       const zoomDistance = 1.5;
       const yOffset = 0.25;
 
-      // Calculate initial target position along the line from Earth through asteroid
       const targetPos = new THREE.Vector3()
         .copy(asteroidPos)
         .addScaledVector(dir, zoomDistance);
@@ -45,50 +49,41 @@ export function useCameraControls(selectedAsteroid: AsteroidPosition | null) {
 
       targetPosition.current.copy(targetPos);
       targetLookAt.current.copy(asteroidPos);
-    } else {
-      liveTargetRef.current = null;
-      // Return to global view
-      targetPosition.current.copy(originalPosition.current);
-      targetLookAt.current.set(2, 1, 2);
+      return;
     }
+
+    selectionTargetRef.current = null;
+    targetPosition.current.copy(DEFAULT_POS);
+    targetLookAt.current.copy(DEFAULT_LOOK);
   }, [selectedAsteroid, scene]);
 
-  // Interpolate camera frame by frame for ultra-smooth transitions and live tracking
   useFrame((state, delta) => {
     const speed = 3.2;
     const t = Math.min(delta * speed, 1);
 
-    if (liveTargetRef.current) {
-      const livePos = new THREE.Vector3();
-      liveTargetRef.current.getWorldPosition(livePos);
+    if (selectionTargetRef.current) {
+      selectionTargetRef.current.getWorldPosition(livePosScratch.current);
 
-      // Earth position matching EarthSystem.tsx
-      const earthPos = new THREE.Vector3(-6, 4, 5);
-      const dir = new THREE.Vector3().subVectors(livePos, earthPos).normalize();
+      const dir = new THREE.Vector3()
+        .subVectors(livePosScratch.current, EARTH_POS)
+        .normalize();
 
       const zoomDistance = 1.5;
       const yOffset = 0.25;
 
       const targetPos = new THREE.Vector3()
-        .copy(livePos)
+        .copy(livePosScratch.current)
         .addScaledVector(dir, zoomDistance);
       targetPos.y += yOffset;
 
-      // Update target positions to track the moving asteroid
       targetPosition.current.copy(targetPos);
-      targetLookAt.current.copy(livePos);
+      targetLookAt.current.copy(livePosScratch.current);
     }
 
-    // Smooth position transition
     camera.position.lerp(targetPosition.current, t);
-
-    // Smooth lookAt target transition
     lookAtTarget.current.lerp(targetLookAt.current, t);
-
-    // Rotate camera to face target
     camera.lookAt(lookAtTarget.current);
 
-    // Subtle float drift when no asteroid selected
     if (!selectedAsteroid) {
       const time = state.clock.getElapsedTime();
       camera.position.x += Math.sin(time * 0.15) * 0.0003;

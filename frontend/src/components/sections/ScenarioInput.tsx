@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Zap, X, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
 import { Scenario } from "@/hooks/useWebSockets";
 import { BACKEND_URL } from "@/lib/config";
+import { DEMO_SCENARIO_PHRASE, isEphemeralDemoScenario } from "@/lib/demoScenario";
 
 interface ScenarioInputProps {
   activeScenarios: Scenario[];
@@ -51,6 +52,10 @@ export function ScenarioInput({ activeScenarios, onScenarioInjected, onScenarioR
   const [showCustom, setShowCustom] = useState(false);
 
   async function injectScenario(desc: string, minerals: string[], sev: number) {
+    if (desc === DEMO_SCENARIO_PHRASE) {
+      setError("Use Market Feed Input (Agent 2) for the phrase demo — it stays in-browser only.");
+      return;
+    }
     setSubmitting(true);
     setError("");
     try {
@@ -88,6 +93,10 @@ export function ScenarioInput({ activeScenarios, onScenarioInjected, onScenarioR
   }
 
   async function removeScenario(id: string) {
+    if (isEphemeralDemoScenario(id)) {
+      if (onScenarioRemoved) onScenarioRemoved(id);
+      return;
+    }
     try {
       await fetch(`${BACKEND_URL}/api/scenario/${id}`, { method: "DELETE" });
       if (onScenarioRemoved) onScenarioRemoved(id);

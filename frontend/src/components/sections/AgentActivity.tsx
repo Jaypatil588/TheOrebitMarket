@@ -4,6 +4,8 @@ import { useRef, useState, useEffect } from "react";
 import { motion, useInView } from "framer-motion";
 import { Search, BarChart3, Telescope, Rocket } from "lucide-react";
 import { AgentStatus } from "@/hooks/useWebSockets";
+import { DemoScenarioInput } from "./DemoScenarioInput";
+import { DEMO_SCENARIO_PHRASE } from "@/lib/demoScenario";
 
 interface AgentEntry {
   id: string;
@@ -144,14 +146,45 @@ const MOCK_AGENT_CARD_STATUS: Record<string, "active" | "idle" | "complete"> = {
 
 interface AgentActivityProps {
   agentStatuses?: Record<string, AgentStatus>;
+  demoActive?: boolean;
+  onDemoTrigger?: () => void;
 }
 
-export function AgentActivity({ agentStatuses }: AgentActivityProps) {
+export function AgentActivity({
+  agentStatuses,
+  demoActive = false,
+  onDemoTrigger,
+}: AgentActivityProps) {
   const sectionRef = useRef<HTMLDivElement>(null);
   const isInView = useInView(sectionRef, { once: true, margin: "-100px" });
 
   // Per-agent message history — accumulated from WS agent_status events
   const [agentHistory, setAgentHistory] = useState<Record<string, AgentEntry[]>>({});
+
+  useEffect(() => {
+    if (!demoActive) return;
+    setAgentHistory((prev) => ({
+      ...prev,
+      market_feed: [
+        {
+          id: `demo-mf-${Date.now()}`,
+          message: `ALERT: ${DEMO_SCENARIO_PHRASE} — rare earth urgency spike across ${11} minerals`,
+          timestamp: "just now",
+          status: "active",
+        },
+        ...(prev.market_feed ?? []).slice(0, 5),
+      ],
+      targeting: [
+        {
+          id: `demo-tg-${Date.now()}`,
+          message: "Rare Earth Priority route computed — Ceres → Hygiea, Δv 10.7 km/s",
+          timestamp: "just now",
+          status: "active",
+        },
+        ...(prev.targeting ?? []).slice(0, 5),
+      ],
+    }));
+  }, [demoActive]);
 
   useEffect(() => {
     if (!agentStatuses) return;
@@ -228,7 +261,8 @@ export function AgentActivity({ agentStatuses }: AgentActivityProps) {
           {AGENT_DEFS.map((def, i) => {
             const liveStatus = agentStatuses?.[def.key];
             const liveHistory = agentHistory[def.key];
-            const useMock = !liveStatus?.message && (liveHistory ?? []).length === 0;
+            const useMock =
+              !isLive && !liveStatus?.message && (liveHistory ?? []).length === 0;
 
             let cardStatus: "active" | "idle" | "complete" = "idle";
             if (useMock) {
@@ -260,6 +294,10 @@ export function AgentActivity({ agentStatuses }: AgentActivityProps) {
             );
           })}
         </div>
+
+        {onDemoTrigger && (
+          <DemoScenarioInput onTrigger={onDemoTrigger} triggered={demoActive} />
+        )}
 
         {/* Status footer */}
         <motion.div

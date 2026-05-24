@@ -9,6 +9,8 @@ import { AsteroidBelt, AsteroidData } from "./AsteroidBelt";
 import { RouteLines } from "./RouteLines";
 import { useCameraControls } from "@/hooks/useCameraControls";
 import { MissionRoute } from "@/hooks/useWebSockets";
+import { getRouteAsteroidIds, needsRoutePlacement } from "@/lib/mockRoutePlacement";
+import { MOCK_ROUTE } from "@/lib/mockRoutes";
 
 // ─── Toggle to true to render the shadow camera frustum wireframe in the browser ───
 const DEBUG_SHADOW_CAMERA = false;
@@ -43,6 +45,7 @@ interface OrbitSceneProps {
   hoveredRingIndex: number | null;
   onHoverRing: (ringIndex: number | null) => void;
   routes?: MissionRoute[];
+  demoActive?: boolean;
 }
 
 function SceneContent({
@@ -51,9 +54,8 @@ function SceneContent({
   hoveredRingIndex,
   onHoverRing,
   routes,
+  demoActive = false,
 }: OrbitSceneProps) {
-  useCameraControls(selectedAsteroid);
-
   // DirectionalLight ref — used for shadow camera debug helper
   const sunRef = useRef<THREE.DirectionalLight>(null);
 
@@ -86,6 +88,21 @@ function SceneContent({
 
   const selectedRingIndex =
     selectedAsteroid !== null ? selectedAsteroid.ringIndex : null;
+
+  const mockRoutePlacement = needsRoutePlacement(routes, demoActive);
+
+  const defaultRoute = useMemo(() => {
+    const list = routes && routes.length > 0 ? routes : [MOCK_ROUTE];
+    return list.find((r) => r.is_default) ?? list[0] ?? MOCK_ROUTE;
+  }, [routes]);
+
+  useCameraControls(selectedAsteroid);
+
+  const routedAsteroidIds = useMemo(
+    () => getRouteAsteroidIds(defaultRoute),
+    [defaultRoute]
+  );
+  const routeColor = defaultRoute.color_hex || "#22d3ee";
 
   return (
     <>
@@ -177,9 +194,16 @@ function SceneContent({
         selectedAsteroid={selectedAsteroid}
         onSelectAsteroid={onSelectAsteroid}
         onHoverRing={onHoverRing}
+        mockRoutePlacement={mockRoutePlacement}
+        routedAsteroidIds={routedAsteroidIds}
+        routeColor={routeColor}
       />
 
-      <RouteLines selectedAsteroid={selectedAsteroid} routes={routes} />
+      <RouteLines
+        selectedAsteroid={selectedAsteroid}
+        routes={routes}
+        mockRoutePlacement={mockRoutePlacement}
+      />
     </>
   );
 }
@@ -190,6 +214,7 @@ export default function OrbitScene({
   hoveredRingIndex,
   onHoverRing,
   routes,
+  demoActive = false,
 }: OrbitSceneProps) {
   return (
     <div className="w-full h-full bg-black">
@@ -220,6 +245,7 @@ export default function OrbitScene({
             hoveredRingIndex={hoveredRingIndex}
             onHoverRing={onHoverRing}
             routes={routes}
+            demoActive={demoActive}
           />
         </Suspense>
       </Canvas>

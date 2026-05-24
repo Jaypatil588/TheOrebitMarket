@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { HeroOverlay } from "@/components/sections/HeroOverlay";
 import { StrategicRankings } from "@/components/sections/StrategicRankings";
@@ -10,6 +10,12 @@ import { AsteroidDetail } from "@/components/HUD/AsteroidDetail";
 import { RouteDetailPopup } from "@/components/HUD/RouteDetailPopup";
 import { AsteroidData } from "@/components/Map3D/AsteroidBelt";
 import { useOrebitWebSocket, Scenario, MissionRoute } from "@/hooks/useWebSockets";
+import { getDisplayRoutes } from "@/lib/mockRoutePlacement";
+import {
+  DEMO_SCENARIO,
+  buildDemoPriceFeed,
+  isEphemeralDemoScenario,
+} from "@/lib/demoScenario";
 import { BACKEND_URL, WS_URL } from "@/lib/config";
 
 const OrbitScene = dynamic(() => import("@/components/Map3D/OrbitScene"), {
@@ -21,15 +27,50 @@ export default function Home() {
   const [selectedRoute, setSelectedRoute] = useState<MissionRoute | null>(null);
   const [hoveredRingIndex, setHoveredRingIndex] = useState<number | null>(null);
   const [activeScenarios, setActiveScenarios] = useState<Scenario[]>([]);
+  const [demoActive, setDemoActive] = useState(false);
 
-  const { marketPrices, rankings, routes, agentStatuses } = useOrebitWebSocket(`${WS_URL}/feed`);
+  const {
+    marketPrices,
+    rankings,
+    routes,
+    agentStatuses,
+    hasLivePrices,
+    hasLiveRankings,
+    hasLiveRoutes,
+  } = useOrebitWebSocket(`${WS_URL}/feed`);
+
+  const displayRoutes = useMemo(
+    () => getDisplayRoutes(routes, { demoActive }),
+    [routes, demoActive]
+  );
+  const displayPrices = useMemo(
+    () => (demoActive ? buildDemoPriceFeed(marketPrices) : marketPrices),
+    [demoActive, marketPrices]
+  );
+  /** Browser-only cascade — no network; demo scenario is not merged into DB-backed list */
+  const handleDemoTrigger = useCallback(() => {
+    setDemoActive(true);
+  }, []);
+
+  const handleDemoDismiss = useCallback(() => {
+    setDemoActive(false);
+  }, []);
+
+  const displayScenarios = useMemo(() => {
+    const persisted = activeScenarios.filter((s) => !isEphemeralDemoScenario(s.id));
+    return demoActive ? [DEMO_SCENARIO, ...persisted] : persisted;
+  }, [activeScenarios, demoActive]);
 
   useEffect(() => {
     fetch(`${BACKEND_URL}/api/scenarios`)
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data.scenarios)) {
-          setActiveScenarios(data.scenarios.filter((s: Scenario) => s.active));
+          setActiveScenarios(
+            data.scenarios.filter(
+              (s: Scenario) => s.active && !isEphemeralDemoScenario(s.id)
+            )
+          );
         }
       })
       .catch(() => {});
@@ -73,7 +114,8 @@ export default function Home() {
           onSelectAsteroid={setSelectedAsteroid}
           hoveredRingIndex={hoveredRingIndex}
           onHoverRing={setHoveredRingIndex}
-          routes={routes}
+          routes={displayRoutes}
+          demoActive={demoActive}
         />
       </div>
 
@@ -87,13 +129,35 @@ export default function Home() {
       </section>
 
       {/* Content sections scroll over the 3D scene */}
-      <StrategicRankings rankings={rankings} routes={routes} onRouteClick={setSelectedRoute} />
-      <AgentActivity agentStatuses={agentStatuses} />
+      <StrategicRankings
+        rankings={rankings}
+        routes={routes}
+        displayRoutes={displayRoutes}
+        demoActive={demoActive}
+        hasLiveRankings={hasLiveRankings}
+        hasLiveRoutes={hasLiveRoutes}
+        onRouteClick={setSelectedRoute}
+      />
+      <AgentActivity
+        agentStatuses={agentStatuses}
+        demoActive={demoActive}
+        onDemoTrigger={handleDemoTrigger}
+      />
       <MarketIntel
-        prices={marketPrices}
-        activeScenarios={activeScenarios}
-        onScenarioInjected={(sc) => setActiveScenarios((p) => [sc, ...p])}
-        onScenarioRemoved={(id) => setActiveScenarios((p) => p.filter((s) => s.id !== id))}
+        prices={displayPrices}
+        hasLivePrices={hasLivePrices}
+        activeScenarios={displayScenarios}
+        onScenarioInjected={(sc) => {
+          if (isEphemeralDemoScenario(sc.id)) return;
+          setActiveScenarios((p) => [sc, ...p]);
+        }}
+        onScenarioRemoved={(id) => {
+          if (isEphemeralDemoScenario(id)) {
+            handleDemoDismiss();
+            return;
+          }
+          setActiveScenarios((p) => p.filter((s) => s.id !== id));
+        }}
       />
 
       {/* Route Detail Popup */}

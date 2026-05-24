@@ -5,10 +5,18 @@ import { motion, useInView } from "framer-motion";
 import { ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
 import { formatValue } from "@/lib/utils";
 import { RankedAsteroid, MissionRoute } from "@/hooks/useWebSockets";
+import { hasLiveRoutes } from "@/lib/liveData";
+import { applyDemoRankings } from "@/lib/demoScenario";
 
 interface StrategicRankingsProps {
   rankings?: RankedAsteroid[];
+  /** Live routes from API/WS (empty until Agent 3 completes). */
   routes?: MissionRoute[];
+  /** Routes for UI preview (includes mock when live routes are empty). */
+  displayRoutes?: MissionRoute[];
+  hasLiveRankings?: boolean;
+  hasLiveRoutes?: boolean;
+  demoActive?: boolean;
   onRouteClick?: (route: MissionRoute) => void;
 }
 
@@ -38,71 +46,24 @@ const MOCK_RANKINGS: RankedAsteroid[] = [
   { rank: 8, asteroid_id: "99942", name: "99942 Apophis", spec_type: "S", composite_score: 0.65, net_value_usd: 5.1e10, roi: 142, top_mineral: "cobalt", mineral_urgency: 0.82, delta_v_km_s: 5.88, launch_window_year: 2029, confidence: 0.74, scenario_boosted: false, reasoning: "", trend: "up" },
 ];
 
-const MOCK_ROUTES: MissionRoute[] = [
-  {
-    id: "route-cobalt-urgency",
-    label: "Cobalt Urgency Run",
-    color_hex: "#22d3ee",
-    urgency_score: 0.82,
-    urgency_reason: "DRC supply disruption — cobalt priority",
-    mineral_focus: ["cobalt", "nickel"],
-    is_default: true,
-    scenario_driven: false,
-    stops: [
-      { order: 0, body: "Earth", delta_v_to_next_km_s: 5.21 },
-      { order: 1, body: "433 Eros", asteroid_id: "433", mineral_target: "cobalt", extractable_value_usd: 2.8e11, delta_v_to_next_km_s: 1.2 },
-      { order: 2, body: "99942 Apophis", asteroid_id: "99942", mineral_target: "cobalt", extractable_value_usd: 5.1e10, delta_v_to_next_km_s: 2.4 },
-      { order: 3, body: "Earth", delta_v_to_next_km_s: 0 },
-    ],
-    totals: { total_value_usd: 3.31e11, total_cost_usd: 4.2e10, net_return_usd: 2.89e11, roi_pct: 688, duration_years: 4.2, total_delta_v_km_s: 8.81, minerals_covered: ["cobalt", "nickel"] },
-    route_reasoning: "High-urgency cobalt targets with lowest combined Δv",
-  },
-  {
-    id: "route-pgm-cluster",
-    label: "PGM Cluster",
-    color_hex: "#a78bfa",
-    urgency_score: 0.51,
-    urgency_reason: "Platinum group metals supply tightening",
-    mineral_focus: ["platinum", "palladium"],
-    is_default: false,
-    scenario_driven: false,
-    stops: [
-      { order: 0, body: "Earth", delta_v_to_next_km_s: 4.65 },
-      { order: 1, body: "25143 Itokawa", asteroid_id: "25143", mineral_target: "platinum", extractable_value_usd: 4.2e11, delta_v_to_next_km_s: 1.8 },
-      { order: 2, body: "Earth", delta_v_to_next_km_s: 0 },
-    ],
-    totals: { total_value_usd: 4.2e11, total_cost_usd: 3.1e10, net_return_usd: 3.89e11, roi_pct: 1255, duration_years: 3.1, total_delta_v_km_s: 6.45, minerals_covered: ["platinum"] },
-    route_reasoning: "Accessible S-type with confirmed PGM concentrations",
-  },
-  {
-    id: "route-psyche-deep",
-    label: "Psyche Deep Mine",
-    color_hex: "#f97316",
-    urgency_score: 0.82,
-    urgency_reason: "Iron-nickel mega-deposit — long-horizon value",
-    mineral_focus: ["iron", "nickel", "cobalt"],
-    is_default: false,
-    scenario_driven: false,
-    stops: [
-      { order: 0, body: "Earth", delta_v_to_next_km_s: 5.82 },
-      { order: 1, body: "16 Psyche", asteroid_id: "16", mineral_target: "iron", extractable_value_usd: 1.02e13, delta_v_to_next_km_s: 2.8 },
-      { order: 2, body: "Earth", delta_v_to_next_km_s: 0 },
-    ],
-    totals: { total_value_usd: 1.02e13, total_cost_usd: 8.5e10, net_return_usd: 1.019e13, roi_pct: 2840, duration_years: 6.5, total_delta_v_km_s: 8.62, minerals_covered: ["iron", "nickel", "cobalt"] },
-    route_reasoning: "Highest net-value M-type target — flagship mission profile",
-  },
-];
-
-export function StrategicRankings({ rankings, routes, onRouteClick }: StrategicRankingsProps) {
+export function StrategicRankings({
+  rankings,
+  routes,
+  displayRoutes: displayRoutesProp,
+  hasLiveRankings: hasLiveRankingsProp = false,
+  hasLiveRoutes: hasLiveRoutesProp = false,
+  demoActive = false,
+  onRouteClick,
+}: StrategicRankingsProps) {
   const sectionRef = useRef<HTMLDivElement>(null);
   const isInView = useInView(sectionRef, { once: true, margin: "-100px" });
 
-  const hasData = rankings && rankings.length > 0;
-  const hasRoutes = routes && routes.length > 0;
-  const displayRankings = hasData ? rankings! : MOCK_RANKINGS;
-  const displayRoutes = hasRoutes ? routes! : MOCK_ROUTES;
-  const isLive = hasData;
-  const defaultRoute = displayRoutes.find((r) => r.is_default);
+  const hasLiveRankings = hasLiveRankingsProp;
+  const liveRoutes = demoActive || hasLiveRoutesProp || hasLiveRoutes(routes);
+  const baseRankings = hasLiveRankings ? rankings! : MOCK_RANKINGS;
+  const displayRankings = demoActive ? applyDemoRankings(baseRankings) : baseRankings;
+  const displayRoutes = displayRoutesProp ?? routes ?? [];
+  const defaultRoute = displayRoutes.find((r) => r.is_default) ?? displayRoutes[0];
 
   return (
     <section
@@ -125,7 +86,7 @@ export function StrategicRankings({ rankings, routes, onRouteClick }: StrategicR
             >
               THE TARGETS
             </h2>
-            {isLive ? (
+            {hasLiveRankings ? (
               <span className="flex items-center gap-1.5 text-xs font-mono uppercase tracking-wider px-2 py-1 rounded"
                 style={{ background: "rgba(52,211,153,0.1)", color: "var(--positive)" }}>
                 <div className="w-1.5 h-1.5 rounded-full pulse-active" style={{ background: "var(--positive)" }} />
@@ -135,7 +96,13 @@ export function StrategicRankings({ rankings, routes, onRouteClick }: StrategicR
               <span className="flex items-center gap-1.5 text-xs font-mono uppercase tracking-wider px-2 py-1 rounded"
                 style={{ background: "rgba(251,191,36,0.1)", color: "var(--warning)" }}>
                 <div className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--warning)" }} />
-                SIMULATED
+                AWAITING DATA
+              </span>
+            )}
+            {!liveRoutes && (
+              <span className="text-xs font-mono uppercase tracking-wider px-2 py-1 rounded"
+                style={{ background: "rgba(148,163,184,0.12)", color: "var(--dust-dim)" }}>
+                ROUTE PREVIEW
               </span>
             )}
           </div>
@@ -156,7 +123,7 @@ export function StrategicRankings({ rankings, routes, onRouteClick }: StrategicR
           >
             <div className="w-2 h-2 rounded-full" style={{ background: defaultRoute.color_hex }} />
             <span className="text-sm font-mono" style={{ color: defaultRoute.color_hex }}>
-              Active Route: {defaultRoute.label}
+              {liveRoutes ? "Active Route" : "Preview Route"}: {defaultRoute.label}
             </span>
             <span className="text-xs ml-auto" style={{ color: "var(--dust-dim)" }}>
               {defaultRoute.stops.length - 2} stops · Δv {defaultRoute.totals.total_delta_v_km_s?.toFixed(1)} km/s · {defaultRoute.urgency_reason}
@@ -298,9 +265,13 @@ export function StrategicRankings({ rankings, routes, onRouteClick }: StrategicR
           className="mt-6 text-sm tracking-wide"
           style={{ color: "var(--dust-dim)" }}
         >
-          {isLive
-            ? `Rankings updated by Strategic Ranker agent · ${displayRankings.length} targets · ${displayRoutes.length} routes computed`
-            : `Simulated rankings · ${displayRankings.length} targets · ${displayRoutes.length} routes — awaiting agent data`}
+          {hasLiveRankings && liveRoutes
+            ? `Live rankings and routes from Strategic Ranker · ${displayRankings.length} targets · ${displayRoutes.length} routes`
+            : hasLiveRankings
+              ? `Live rankings · ${displayRankings.length} targets — mission routes still computing (Agent 3)`
+              : liveRoutes
+                ? `${displayRoutes.length} routes ready — rankings pending Agent 3`
+                : `Demo table until Agent 3 finishes · map shows route preview until live routes arrive`}
         </motion.p>
       </div>
     </section>

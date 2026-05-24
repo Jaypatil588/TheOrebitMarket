@@ -8,6 +8,8 @@ import { ScenarioInput } from "./ScenarioInput";
 
 interface MarketIntelProps {
   prices?: MarketPrice[];
+  /** True when prices were loaded from API/WS (demo overlays still count as live). */
+  hasLivePrices?: boolean;
   activeScenarios?: Scenario[];
   onScenarioInjected?: (sc: Scenario) => void;
   onScenarioRemoved?: (id: string) => void;
@@ -75,6 +77,7 @@ function SeverityIcon({ urgency, scenario }: { urgency: number; scenario: boolea
 
 export function MarketIntel({
   prices,
+  hasLivePrices = false,
   activeScenarios = [],
   onScenarioInjected,
   onScenarioRemoved,
@@ -82,10 +85,8 @@ export function MarketIntel({
   const sectionRef = useRef<HTMLDivElement>(null);
   const isInView = useInView(sectionRef, { once: true, margin: "-100px" });
 
-  const hasData = prices && prices.length > 0;
-  const activePrices = hasData ? prices : MOCK_PRICES;
-
-  const isLive = true;
+  const isLive = hasLivePrices;
+  const activePrices = isLive && prices && prices.length > 0 ? prices : MOCK_PRICES;
 
   // Show top 6 by urgency for the grid cards
   const displayPrices = [...activePrices]
@@ -119,13 +120,11 @@ export function MarketIntel({
             >
               THE MARKETS
             </h2>
-            {isLive && (
-              <span className="flex items-center gap-1.5 text-xs font-mono uppercase tracking-wider px-2 py-1 rounded"
-                style={{ background: hasData ? "rgba(52,211,153,0.1)" : "rgba(251,191,36,0.1)", color: hasData ? "var(--positive)" : "var(--warning)" }}>
-                <div className="w-1.5 h-1.5 rounded-full pulse-active" style={{ background: hasData ? "var(--positive)" : "var(--warning)" }} />
-                {hasData ? "LIVE" : "SIMULATED"}
-              </span>
-            )}
+            <span className="flex items-center gap-1.5 text-xs font-mono uppercase tracking-wider px-2 py-1 rounded"
+              style={{ background: isLive ? "rgba(52,211,153,0.1)" : "rgba(251,191,36,0.1)", color: isLive ? "var(--positive)" : "var(--warning)" }}>
+              <div className={`w-1.5 h-1.5 rounded-full ${isLive ? "pulse-active" : ""}`} style={{ background: isLive ? "var(--positive)" : "var(--warning)" }} />
+              {isLive ? "LIVE" : "AWAITING DATA"}
+            </span>
           </div>
           <p className="text-base" style={{ color: "var(--dust)" }}>
             Live commodity intelligence driving asteroid valuations — sourced by Market Intelligence agent
@@ -265,8 +264,8 @@ export function MarketIntel({
           style={{ color: "var(--dust-dim)" }}
         >
           {isLive
-            ? `${hasData ? "Live" : "Simulated"} data — ${activePrices.length} minerals tracked · Refreshes every 10s via Agent 2`
-            : null}
+            ? `Live data — ${activePrices.length} minerals tracked · Refreshes every 10s via Agent 2`
+            : "Simulated commodity preview — awaiting Agent 2 market feed"}
         </motion.p>
       </div>
     </section>

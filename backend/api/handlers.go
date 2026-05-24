@@ -157,6 +157,15 @@ func (a *API) PostScenarioHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "description is required", http.StatusBadRequest)
 		return
 	}
+	// Frontend phrase demo (demoScenario.ts) — must stay ephemeral in the browser
+	if sc.ID != "" && strings.HasPrefix(sc.ID, "demo-") {
+		http.Error(w, "ephemeral demo scenarios cannot be persisted", http.StatusBadRequest)
+		return
+	}
+	if strings.TrimSpace(sc.Description) == "China just blocked rare earth material export" {
+		http.Error(w, "use the in-browser phrase demo — this headline is not persisted", http.StatusBadRequest)
+		return
+	}
 	if sc.ID == "" {
 		sc.ID = fmt.Sprintf("sc_%d", time.Now().UnixNano())
 	}
