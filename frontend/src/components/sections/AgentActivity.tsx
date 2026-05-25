@@ -183,6 +183,8 @@ interface AgentActivityProps {
   missionFeedLogs?: string[];
   demoActive?: boolean;
   onDemoTrigger?: () => void;
+  continuousResearch?: boolean;
+  onToggleContinuousResearch?: () => void;
 }
 
 function feedLogsForAgent(
@@ -239,6 +241,8 @@ export function AgentActivity({
   missionFeedLogs = [],
   demoActive = false,
   onDemoTrigger,
+  continuousResearch = false,
+  onToggleContinuousResearch,
 }: AgentActivityProps) {
   const sectionRef = useRef<HTMLDivElement>(null);
   const isInView = useInView(sectionRef, { once: true, margin: "-100px" });
@@ -267,20 +271,37 @@ export function AgentActivity({
           transition={{ duration: 0.7 }}
           className="mb-10"
         >
-          <div className="flex items-center gap-3 mb-2">
-            <h2
-              className="text-4xl font-light tracking-[0.15em] text-white"
-              style={{ fontFamily: "var(--font-inter), var(--font-display)" }}
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-2">
+            <div className="flex items-center gap-3">
+              <h2
+                className="text-4xl font-light tracking-[0.15em] text-white"
+                style={{ fontFamily: "var(--font-inter), var(--font-display)" }}
+              >
+                THE INTELLIGENCE
+              </h2>
+              <span
+                className="flex items-center gap-1.5 text-xs font-mono uppercase tracking-wider px-2 py-1 rounded shrink-0"
+                style={{ background: "rgba(52,211,153,0.1)", color: "var(--positive)" }}
+              >
+                <div className="w-1.5 h-1.5 rounded-full pulse-active" style={{ background: "var(--positive)" }} />
+                LIVE
+              </span>
+            </div>
+
+            {/* Continuous Research Toggle */}
+            <button
+              onClick={onToggleContinuousResearch}
+              className={`flex items-center gap-2 px-3.5 py-2 font-mono text-[10px] font-bold tracking-wider rounded border transition-all duration-300 cursor-pointer shrink-0 ${
+                continuousResearch
+                  ? "text-amber-400 bg-amber-500/10 border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.15)] animate-pulse"
+                  : "text-slate-400 bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.05] hover:text-slate-200"
+              }`}
             >
-              THE INTELLIGENCE
-            </h2>
-            <span
-              className="flex items-center gap-1.5 text-xs font-mono uppercase tracking-wider px-2 py-1 rounded"
-              style={{ background: "rgba(52,211,153,0.1)", color: "var(--positive)" }}
-            >
-              <div className="w-1.5 h-1.5 rounded-full pulse-active" style={{ background: "var(--positive)" }} />
-              LIVE
-            </span>
+              <div
+                className={`w-1.5 h-1.5 rounded-full ${continuousResearch ? "bg-amber-400 animate-ping" : "bg-slate-500"}`}
+              />
+              <span>{continuousResearch ? "CONTINUOUS MARKET RESEARCH" : "RUN ONCE ON LOGIN"}</span>
+            </button>
           </div>
           <p className="text-base" style={{ color: "var(--dust)" }}>
             Four Gemini managed agents working in parallel — scraping markets, valuing asteroids, optimizing routes

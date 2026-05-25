@@ -238,7 +238,13 @@ export function AsteroidDetail({
       ? `${BACKEND_URL}/api/asteroid/${selectedAsteroid.id}?route_id=${encodeURIComponent(routeId)}`
       : `${BACKEND_URL}/api/asteroid/${selectedAsteroid.id}`;
 
-    fetch(detailUrl)
+    const geminiKey = typeof window !== "undefined" ? localStorage.getItem("orebit_gemini_api_key") : null;
+    const headers: Record<string, string> = {};
+    if (geminiKey) {
+      headers["x-gemini-api-key"] = geminiKey;
+    }
+
+    fetch(detailUrl, { headers })
       .then((r) => {
         if (!r.ok) throw new Error();
         return r.json();

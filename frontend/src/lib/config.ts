@@ -1,6 +1,6 @@
-// Backend URLs — override via env vars for production deployment
+const isBrowser = typeof window !== 'undefined';
 export const BACKEND_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8080";
+  process.env.NEXT_PUBLIC_BACKEND_URL || (isBrowser ? "" : "http://localhost:3000");
 
 export const WS_URL =
-  process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8080";
+  process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8080";

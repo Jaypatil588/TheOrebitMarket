@@ -9,6 +9,7 @@ import { MarketIntel } from "@/components/sections/MarketIntel";
 import { AsteroidDetail } from "@/components/HUD/AsteroidDetail";
 import { RouteDetailPopup } from "@/components/HUD/RouteDetailPopup";
 import { AsteroidData } from "@/components/Map3D/AsteroidBelt";
+import { GeminiKeyBanner } from "@/components/common/GeminiKeyBanner";
 import { useOrebitWebSocket, Scenario, MissionRoute, RankedAsteroid } from "@/hooks/useWebSockets";
 import { getDisplayRoutes } from "@/lib/mockRoutePlacement";
 import { rankedToAsteroidData } from "@/lib/asteroidSelection";
@@ -35,6 +36,19 @@ export default function Home() {
   const [activeScenarios, setActiveScenarios] = useState<Scenario[]>([]);
   const [demoActive, setDemoActive] = useState(false);
   const [clientMissionReport, setClientMissionReport] = useState<MissionReportData | null>(null);
+  const [showKeyBanner, setShowKeyBanner] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 150) {
+        setShowKeyBanner(true);
+      } else {
+        setShowKeyBanner(false);
+      }
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   const {
     marketPrices,
@@ -49,6 +63,8 @@ export default function Home() {
     hasLivePrices,
     hasLiveRankings,
     hasLiveRoutes,
+    continuousResearch,
+    setContinuousResearch,
   } = useOrebitWebSocket(`${WS_URL}/feed`);
 
   const displayRoutes = useMemo(
@@ -192,6 +208,8 @@ export default function Home() {
         missionFeedLogs={missionFeedLogs}
         demoActive={demoActive}
         onDemoTrigger={handleDemoTrigger}
+        continuousResearch={continuousResearch}
+        onToggleContinuousResearch={() => setContinuousResearch((prev) => !prev)}
       />
       <MarketIntel
         prices={displayPrices}
@@ -212,6 +230,9 @@ export default function Home() {
 
       {/* Route Detail Popup */}
       <RouteDetailPopup route={selectedRoute} onClose={() => setSelectedRoute(null)} />
+
+      {/* Floating Gemini API key prompt when scrolling down past landing screen */}
+      <GeminiKeyBanner isVisible={showKeyBanner} />
     </main>
   );
 }

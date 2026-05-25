@@ -36,3 +36,4 @@ backend/data/all_asteroids_raw.json
 # OS Files
 .DS_Store
 Thumbs.db
+.vercel

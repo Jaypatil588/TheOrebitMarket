@@ -1,0 +1,7 @@
+node_modules/
+.next/
+backend/
+tom_backend
+orebit-backend
+.git/
+.vercel/
