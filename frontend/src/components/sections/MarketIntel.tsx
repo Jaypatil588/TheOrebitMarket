@@ -91,7 +91,7 @@ export function MarketIntel({
   return (
     <section
       ref={sectionRef}
-      className="snap-section relative z-10 flex flex-col items-center justify-center px-8"
+      className="snap-section relative z-10 flex flex-col items-center justify-start px-6 py-20 md:px-8 md:py-24"
       style={{ background: "transparent" }}
     >
       <div className="w-full max-w-[1100px]">
@@ -104,7 +104,7 @@ export function MarketIntel({
         >
           <div className="flex items-center gap-3 mb-2">
             <h2
-              className="text-4xl font-light tracking-[0.15em] text-white"
+              className="text-3xl md:text-[2rem] font-light tracking-[0.1em] text-white"
               style={{ fontFamily: "var(--font-inter), var(--font-display)" }}
             >
               THE MARKETS
@@ -115,7 +115,7 @@ export function MarketIntel({
                 color: isLive ? "var(--positive)" : "var(--dust-dim)",
               }}>
               <div
-                className={`w-1.5 h-1.5 rounded-full ${isLive ? "pulse-active" : ""}`}
+                className="w-1.5 h-1.5 rounded-full"
                 style={{ background: isLive ? "var(--positive)" : "var(--dust-dim)" }}
               />
               {isLive ? "LIVE" : "SYNCING"}
@@ -134,7 +134,7 @@ export function MarketIntel({
             </p>
           </div>
         ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 mb-8">
           {displayPrices.map((p, i) => (
             <motion.div
               key={p.mineral}
@@ -155,7 +155,7 @@ export function MarketIntel({
               </div>
 
               <div>
-                <span className="text-2xl font-mono font-semibold text-white">
+                <span className="text-xl font-mono font-semibold text-white">
                   ${formatPrice(p.price_usd)}
                 </span>
                 <span className="text-xs ml-1" style={{ color: "var(--dust-dim)" }}>

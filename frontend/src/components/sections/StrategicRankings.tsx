@@ -61,7 +61,7 @@ export function StrategicRankings({
   return (
     <section
       ref={sectionRef}
-      className="snap-section relative z-10 flex flex-col items-center justify-center px-8"
+      className="snap-section relative z-10 flex flex-col items-center justify-start px-6 py-20 md:px-8 md:py-24"
       style={{ background: "transparent" }}
     >
       <div className="w-full max-w-[1100px]">
@@ -74,7 +74,7 @@ export function StrategicRankings({
         >
           <div className="flex items-center gap-3 mb-2">
             <h2
-              className="text-4xl font-light tracking-[0.15em] text-white"
+              className="text-3xl md:text-[2rem] font-light tracking-[0.1em] text-white"
               style={{ fontFamily: "var(--font-inter), var(--font-display)" }}
             >
               THE TARGETS
@@ -85,7 +85,7 @@ export function StrategicRankings({
                 color: hasLiveRankings ? "var(--positive)" : "var(--dust-dim)",
               }}>
               <div
-                className={`w-1.5 h-1.5 rounded-full ${hasLiveRankings ? "pulse-active" : ""}`}
+                className="w-1.5 h-1.5 rounded-full"
                 style={{ background: hasLiveRankings ? "var(--positive)" : "var(--dust-dim)" }}
               />
               {hasLiveRankings ? "LIVE" : "SYNCING"}
@@ -169,7 +169,7 @@ export function StrategicRankings({
                   </td>
                   <td>
                     <div className="flex items-center gap-1.5">
-                      <span className="text-white font-medium text-lg" style={{ fontFamily: "var(--font-display)" }}>
+                      <span className="text-white font-medium text-base" style={{ fontFamily: "var(--font-display)" }}>
                         {ast.name}
                       </span>
                       {ast.scenario_boosted && (

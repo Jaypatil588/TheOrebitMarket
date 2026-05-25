@@ -64,7 +64,7 @@ function TerminalAgentCard({
       initial={{ opacity: 0, y: 30 }}
       animate={isInView ? { opacity: 1, y: 0 } : {}}
       transition={{ duration: 0.6, delay }}
-      className="glass-card glass-card-hover flex flex-col h-[380px]"
+      className="glass-card glass-card-hover flex flex-col h-[320px] md:h-[340px]"
     >
       <div
         className="px-5 py-4 border-b flex items-center justify-between"
@@ -110,7 +110,7 @@ function TerminalAgentCard({
 
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto mx-3 my-3 rounded border px-3 py-2.5 font-mono text-base leading-relaxed tracking-normal"
+        className="flex-1 overflow-y-auto mx-3 my-3 rounded border px-3 py-2.5 font-mono text-sm leading-normal tracking-normal"
         style={{
           scrollbarWidth: "thin",
           borderColor,
@@ -261,7 +261,7 @@ export function AgentActivity({
   return (
     <section
       ref={sectionRef}
-      className="snap-section relative z-10 flex flex-col items-center justify-center px-8"
+      className="snap-section relative z-10 flex flex-col items-center justify-start px-6 py-20 md:px-8 md:py-24"
       style={{ background: "transparent" }}
     >
       <div className="w-full max-w-[1100px]">
@@ -274,7 +274,7 @@ export function AgentActivity({
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-2">
             <div className="flex items-center gap-3">
               <h2
-                className="text-4xl font-light tracking-[0.15em] text-white"
+                className="text-3xl md:text-[2rem] font-light tracking-[0.1em] text-white"
                 style={{ fontFamily: "var(--font-inter), var(--font-display)" }}
               >
                 THE INTELLIGENCE
@@ -283,7 +283,7 @@ export function AgentActivity({
                 className="flex items-center gap-1.5 text-xs font-mono uppercase tracking-wider px-2 py-1 rounded shrink-0"
                 style={{ background: "rgba(52,211,153,0.1)", color: "var(--positive)" }}
               >
-                <div className="w-1.5 h-1.5 rounded-full pulse-active" style={{ background: "var(--positive)" }} />
+                <div className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--positive)" }} />
                 LIVE
               </span>
             </div>

@@ -33,7 +33,7 @@
 
   /* Typography */
   --font-display: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-mono: var(--font-display);
 }
 
 html {
@@ -154,8 +154,8 @@ html, body {
 .data-table {
   width: 100%;
   border-collapse: collapse;
-  font-family: var(--font-mono);
-  font-size: 13px;
+  font-family: var(--font-display);
+  font-size: 12px;
 }
 
 .data-table thead th {
@@ -165,7 +165,7 @@ html, body {
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--dust-dim);
-  padding: 12px 16px;
+  padding: 10px 14px;
   text-align: left;
   border-bottom: 1px solid var(--orbit);
 }
@@ -181,7 +181,7 @@ html, body {
 }
 
 .data-table tbody td {
-  padding: 14px 16px;
+  padding: 12px 14px;
   white-space: nowrap;
 }
 

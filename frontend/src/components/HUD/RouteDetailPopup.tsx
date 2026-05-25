@@ -39,9 +39,9 @@ function Section({ icon, title, children }: { icon: React.ReactNode; title: stri
     <div className="space-y-3">
       <div className="flex items-center gap-2 pb-2 border-b border-white/[0.06]">
         <span className="text-slate-500">{icon}</span>
-        <span className="text-sm font-mono font-semibold tracking-widest text-slate-400 uppercase">
+        <h3 className="text-sm font-semibold tracking-widest text-slate-400 uppercase">
           {title}
-        </span>
+        </h3>
       </div>
       {children}
     </div>
