@@ -609,99 +609,31 @@ export function useOrebitWebSocket(url?: string) {
       }, 800); // Faster ticks for more dynamic feel
     };
 
+    // Serverless mode: Boot simulation immediately as there is no long-running WebSocket server on Vercel.
     const doConnect = () => {
-      try {
-        ws = new WebSocket(url);
-        socketRef.current = ws;
-      } catch {
-        scheduleReconnect();
-        return;
-      }
-
-      ws.onopen = () => {
-        attempt = 0;
-        setConnected(true);
-        console.log("[WS] Connected to", url);
-        void loadBootstrap();
-      };
-
-      ws.onclose = () => {
-        setConnected(false);
-        socketRef.current = null;
-        if (!cancelled) scheduleReconnect();
-      };
-
-      ws.onerror = () => {
-        console.warn("[WS] Connection error — falling back to simulation");
-        if (!cancelled) startSimulation();
-      };
-
-      ws.onmessage = (event) => {
-        for (const data of parseWsFrames(event.data)) {
-          try {
-            handleWsPayload(data);
-          } catch (e) {
-            console.error("[WS] Handler error:", e);
-          }
-        }
-      };
+      // In a pure Vercel Serverless environment, we rely on the client-side simulation 
+      // for the visual log feed, and we use REST API edge functions for heavy Gemini workloads.
+      startSimulation();
     };
 
     const connect = () => {
       if (cancelled) return;
-      
       const savedKey = typeof window !== "undefined" ? localStorage.getItem("orebit_gemini_api_key") : null;
 
-      // If no production WebSocket URL is configured, fallback to simulation instantly
-      if (!url) {
-        loadBootstrap().then(() => startSimulation()).catch(() => startSimulation());
-        return;
+      if (!savedKey) {
+        console.log("[Feed] No API key provided — initializing demo mode");
+        loadBootstrap().then(() => doConnect()).catch(() => doConnect());
+      } else {
+        console.log("[Feed] API key detected — initializing live Vercel environment");
+        loadBootstrap().then(() => doConnect()).catch(() => doConnect());
       }
-
-      // If we have a local key saved in the UI, connect to the real feed immediately
-      if (savedKey) {
-        doConnect();
-        return;
-      }
-
-      // Check if backend has a key configured via its .env
-      fetch(`${BACKEND_URL}/api/settings/status`)
-        .then((r) => r.json())
-        .then((data) => {
-          if (cancelled) return;
-          if (data.has_api_key) {
-            console.log("[WS] Backend has API key from .env — connecting to live feed");
-            doConnect();
-          } else {
-            console.log("[WS] No API key found — starting simulation");
-            loadBootstrap().then(() => startSimulation()).catch(() => startSimulation());
-          }
-        })
-        .catch(() => {
-          if (cancelled) return;
-          loadBootstrap().then(() => startSimulation()).catch(() => startSimulation());
-        });
-    };
-
-    const scheduleReconnect = () => {
-      if (cancelled) return;
-      if (attempt >= 2) {
-        startSimulation();
-        return;
-      }
-      const delay = Math.min(1000 * 2 ** attempt, 15000);
-      attempt += 1;
-      reconnectTimer = setTimeout(connect, delay);
     };
 
     connect();
 
     return () => {
       cancelled = true;
-      if (reconnectTimer) clearTimeout(reconnectTimer);
       if (simulationTimer) clearInterval(simulationTimer);
-      ws?.close();
-      socketRef.current = null;
     };
   }, [url, handleWsPayload, loadBootstrap, appendMarketFeedLogs, appendRankerFeedLogs, appendValuationFeedLogs, appendMissionFeedLogs, addLog]);
 
