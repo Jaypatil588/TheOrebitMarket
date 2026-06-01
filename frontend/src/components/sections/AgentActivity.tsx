@@ -337,6 +337,50 @@ export function AgentActivity({
         </div>
 
         {onDemoTrigger && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={isInView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.6, delay: 0.7 }}
+            className="mt-8 flex flex-col items-center gap-4"
+          >
+            {/* ⚡ COBALT RUN — Primary CTA with strobing yellow/black glow */}
+            <button
+              onClick={onDemoTrigger}
+              disabled={demoActive}
+              className={`cobalt-run-strobe flex items-center gap-3 px-8 py-4 rounded-lg font-mono text-sm font-bold tracking-[0.2em] uppercase transition-all duration-300 ${
+                demoActive ? "opacity-60 cursor-not-allowed" : "hover:scale-[1.03] active:scale-[0.98]"
+              }`}
+              style={{
+                minWidth: 340,
+                ...(demoActive ? {
+                  animation: "none",
+                  background: "rgba(250,204,21,0.08)",
+                  borderColor: "rgba(250,204,21,0.3)",
+                } : {}),
+              }}
+            >
+              <Rocket size={20} className="shrink-0" style={{ color: "#facc15" }} />
+              <span className="relative z-10">
+                {demoActive ? "⚡ COBALT RUN — ACTIVE" : "⚡ COBALT RUN — LAUNCH ANALYSIS"}
+              </span>
+              {!demoActive && (
+                <span
+                  className="shrink-0 w-2 h-2 rounded-full"
+                  style={{
+                    background: "#facc15",
+                    boxShadow: "0 0 8px rgba(250,204,21,0.6)",
+                    animation: "pulse-signal 1.5s infinite",
+                  }}
+                />
+              )}
+            </button>
+            <span className="text-[10px] font-mono tracking-wider uppercase" style={{ color: "var(--dust-dim)" }}>
+              {demoActive ? "China rare earth export block scenario active" : "Trigger China REE export block scenario"}
+            </span>
+          </motion.div>
+        )}
+
+        {onDemoTrigger && (
           <DemoScenarioInput onTrigger={onDemoTrigger} triggered={demoActive} />
         )}
 

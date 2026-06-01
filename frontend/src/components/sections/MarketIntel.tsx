@@ -80,7 +80,7 @@ export function MarketIntel({
 
   const displayPrices = [...activePrices]
     .sort((a, b) => b.urgency - a.urgency)
-    .slice(0, 6);
+    .slice(0, 12);
 
   // Show disruptions for the alerts panel
   const alerts = activePrices

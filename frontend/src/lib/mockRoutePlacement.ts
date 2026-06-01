@@ -1,5 +1,5 @@
 import type { MissionRoute } from "@/types/orebit";
-import { MOCK_ROUTE } from "@/lib/mockRoutes";
+import { MOCK_ROUTE, ALL_MOCK_ROUTES } from "@/lib/mockRoutes";
 import { DEMO_ROUTE, DEMO_ROUTE_ASTEROID_IDS } from "@/lib/demoScenario";
 import { filterLiveRoutes, hasLiveRoutes } from "@/lib/liveData";
 
@@ -50,7 +50,7 @@ export function getDisplayRoutes(
     return [{ ...DEMO_ROUTE, is_default: true }, ...live];
   }
   if (live.length > 0) return live;
-  return [{ ...MOCK_ROUTE, is_default: true }];
+  return ALL_MOCK_ROUTES.map((r, i) => ({ ...r, is_default: i === 0 }));
 }
 
 export function needsRoutePlacement(routes?: MissionRoute[], demoActive?: boolean): boolean {

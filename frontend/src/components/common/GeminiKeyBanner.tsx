@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Key, Check, Edit3, Save, Sparkles } from "lucide-react";
+import { Key, Check, Edit3, Save, Sparkles, RefreshCw } from "lucide-react";
+import { BACKEND_URL } from "@/lib/config";
 
 interface GeminiKeyBannerProps {
   isVisible: boolean;
@@ -12,20 +13,42 @@ export function GeminiKeyBanner({ isVisible }: GeminiKeyBannerProps) {
   const [apiKey, setApiKey] = useState("");
   const [isSaved, setIsSaved] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [isReloading, setIsReloading] = useState(false);
 
   useEffect(() => {
     const savedKey = localStorage.getItem("orebit_gemini_api_key");
     if (savedKey) {
       setApiKey(savedKey);
       setIsSaved(true);
+      // Ensure backend has the key on mount in case the backend restarted
+      fetch(`${BACKEND_URL}/api/settings/key`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ api_key: savedKey, initialize_only: true }),
+      }).catch(console.error);
     }
   }, []);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (apiKey.trim()) {
-      localStorage.setItem("orebit_gemini_api_key", apiKey.trim());
+      const keyToSave = apiKey.trim();
+      localStorage.setItem("orebit_gemini_api_key", keyToSave);
       setIsSaved(true);
       setIsEditing(false);
+      setIsReloading(true);
+
+      try {
+        await fetch(`${BACKEND_URL}/api/settings/key`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ api_key: keyToSave, initialize_only: false }),
+        });
+      } catch (e) {
+        console.error("Failed to update backend key:", e);
+      }
+
+      // Hard reload to reset state and establish live WebSocket
+      window.location.reload();
     }
   };
 
@@ -88,16 +111,18 @@ export function GeminiKeyBanner({ isVisible }: GeminiKeyBannerProps) {
                     placeholder="AIzaSy..."
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
-                    className="px-2 py-1.5 font-mono text-xs text-slate-200 bg-slate-900/60 border border-white/[0.08] focus:border-amber-500/50 rounded outline-none w-32 focus:w-44 transition-all duration-300"
+                    disabled={isReloading}
+                    className="px-2 py-1.5 font-mono text-xs text-slate-200 bg-slate-900/60 border border-white/[0.08] focus:border-amber-500/50 rounded outline-none w-32 focus:w-44 transition-all duration-300 disabled:opacity-50"
                   />
                   <button
                     onClick={handleSave}
-                    className="flex items-center gap-1.5 px-3 py-1.5 font-mono text-[10px] font-bold text-black bg-amber-400 hover:bg-amber-300 rounded cursor-pointer transition-all duration-200 shadow-[0_0_10px_rgba(251,191,36,0.3)]"
+                    disabled={isReloading}
+                    className="flex items-center gap-1.5 px-3 py-1.5 font-mono text-[10px] font-bold text-black bg-amber-400 hover:bg-amber-300 disabled:bg-amber-400/50 rounded cursor-pointer transition-all duration-200 shadow-[0_0_10px_rgba(251,191,36,0.3)]"
                   >
-                    <Save size={10} />
-                    <span>SAVE</span>
+                    {isReloading ? <RefreshCw size={10} className="animate-spin" /> : <Save size={10} />}
+                    <span>{isReloading ? "RELOADING" : "SAVE"}</span>
                   </button>
-                  {isSaved && (
+                  {isSaved && !isReloading && (
                     <button
                       onClick={() => setIsEditing(false)}
                       className="px-2 py-1.5 font-mono text-[10px] text-slate-400 hover:text-slate-200 cursor-pointer"

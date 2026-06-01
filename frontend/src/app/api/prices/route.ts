@@ -23,14 +23,16 @@ export async function GET() {
     memStore.prices = fluctuatePrices(memStore.prices);
     const mapped = memStore.prices.map((p) => ({
       mineral: p.mineral,
-      priceUSD: p.price_usd,
+      price_usd: p.price_usd,
       trend: p.trend,
       urgency: p.urgency,
-      changePct: p.change_pct,
+      change_pct: p.change_pct,
       disruption: p.disruption,
-      sourceUrl: p.source_url,
+      source_url: p.source_url,
       category: p.category,
       criticality: p.criticality,
+      scenario_adjusted: false,
+      fetched_at: new Date().toISOString(),
     }));
     return NextResponse.json({ prices: mapped });
   }
@@ -73,14 +75,16 @@ export async function GET() {
 
     const prices = result.rows.map((row) => ({
       mineral: row.mineral,
-      priceUSD: Number(row.price_usd),
+      price_usd: Number(row.price_usd),
       trend: row.trend,
       urgency: Number(row.urgency),
-      changePct: Number(row.change_pct),
+      change_pct: Number(row.change_pct),
       disruption: row.disruption,
-      sourceUrl: row.source_url,
+      source_url: row.source_url,
       category: row.category,
       criticality: Number(row.criticality),
+      scenario_adjusted: false,
+      fetched_at: row.fetched_at ? new Date(row.fetched_at).toISOString() : new Date().toISOString(),
     }));
 
     return NextResponse.json({ prices });

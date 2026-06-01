@@ -136,6 +136,59 @@ func (a *API) PostRefreshHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`{"status":"triggered"}`))
 }
 
+// PostApiKeyHandler updates the Gemini API key dynamically
+func (a *API) PostApiKeyHandler(w http.ResponseWriter, r *http.Request) {
+	EnableCors(w)
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "Only POST allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		APIKey         string `json:"api_key"`
+		InitializeOnly bool   `json:"initialize_only"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if req.APIKey != "" {
+		a.gemini.APIKey = strings.TrimSpace(req.APIKey)
+		log.Printf("[API] Updated Gemini API Key dynamically (len=%d)", len(a.gemini.APIKey))
+		
+		if !req.InitializeOnly {
+			go a.orch.ForceImmediateRefresh()
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(`{"status":"success"}`))
+}
+
+// GetSettingsStatusHandler returns whether the backend has a configured API key
+func (a *API) GetSettingsStatusHandler(w http.ResponseWriter, r *http.Request) {
+	EnableCors(w)
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	
+	hasKey := false
+	if a.gemini != nil && a.gemini.APIKey != "" {
+		hasKey = true
+	}
+	
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]bool{
+		"has_api_key": hasKey,
+	})
+}
+
 // PostScenarioHandler injects a new market disruption scenario into all agents
 func (a *API) PostScenarioHandler(w http.ResponseWriter, r *http.Request) {
 	EnableCors(w)

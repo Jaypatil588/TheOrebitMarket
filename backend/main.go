@@ -79,6 +79,10 @@ func main() {
 		h.GetAsteroidDetailHandler(w, r)
 	})
 
+	// Settings & configuration
+	mux.HandleFunc("/api/settings/key", h.PostApiKeyHandler)
+	mux.HandleFunc("/api/settings/status", h.GetSettingsStatusHandler)
+
 	// Scenario injection
 	mux.HandleFunc("/api/scenario", h.PostScenarioHandler)
 	mux.HandleFunc("/api/scenario/", h.DeleteScenarioHandler)
