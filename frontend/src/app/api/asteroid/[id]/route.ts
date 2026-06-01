@@ -66,98 +66,14 @@ export async function GET(
     }
   }
 
-  // Fallback / Mock Generator when Gemini is not connected or fails
-  const generateMockReport = (id: string) => {
-    return {
-      feasibility_score: 7,
-      composition: {
-        spec_type: 'M',
-        spec_confidence: 0.8,
-        minerals: [
-          { name: 'iron', fraction: 0.82, mass_kg: 1.2e11, value_usd: 1.4e10, current_price_per_kg: 0.12, scenario_impact: false },
-          { name: 'nickel', fraction: 0.12, mass_kg: 1.8e10, value_usd: 2.9e8, current_price_per_kg: 16.40, scenario_impact: false }
-        ],
-        density_kg_m3: 5100,
-        surface_gravity_m_s2: 0.002,
-        research_notes: 'Highly iron-dominant spectral returns confirmed via terrestrial photometric sweeps.'
-      },
-      valuation: {
-        raw_value_usd: 1.8e10,
-        damped_value_usd: 1.5e10,
-        mission_cost_usd: 2.1e9,
-        net_value_usd: 1.29e10,
-        roi_pct: 614.2,
-        scenario_impact_pct: 0
-      },
-      risk: {
-        overall_risk: 'MED',
-        factors: [
-          { category: 'Structural Integrity', severity: 'LOW', description: 'Possible gravel-pile structural profile.', mitigation: 'Use anchor-less electromagnetic scoop mining', source: 'SBDB Photometry' }
-        ],
-        data_gaps: ['Thermal inertia model incomplete.']
-      },
-      mission: {
-        launch_vehicle: 'Falcon Heavy',
-        launch_vehicle_reason: 'Optimized payload volume for heavy metallic mineral loads.',
-        mining_method: 'Anchor-less scoop induction',
-        mining_method_trl: 6,
-        transit_days: 280,
-        surface_ops_days: 180,
-        total_mission_days: 740,
-        total_mission_years: 2.0,
-        next_launch_window: '2028-Q3',
-        distance_current_au: 0.28,
-        delta_v_km_s: 4.8
-      },
-      market: {
-        primary_mineral: 'cobalt',
-        current_price_usd_kg: 33.8,
-        price_trend: 'rising',
-        urgency_score: 0.82,
-        demand_outlook: 'Steady demand growth driven by EV batteries.',
-        supply_chain_event: { found: true, event: 'DRC Mine Flooding', severity: 'HIGH', date: '2026', source_url: '' },
-        scenario_active: false
-      },
-      route_context: {
-        route_id: routeId,
-        route_label: 'Balanced ROI Route',
-        stop_number: 1,
-        total_stops: 3,
-        route_net_value_usd: 1.29e10,
-        route_total_delta_v: 7.2,
-        other_stops: []
-      },
-      go_no_go: {
-        recommendation: 'GO',
-        primary_reason_go: 'Outstanding mineral concentrations and exceptionally low delta-v of 4.8 km/s.',
-        primary_reason_no_go: 'Orbital eccentricity limits launch windows to strict 18-month synodic intervals.',
-        conditions_to_flip: 'Significant price crash in global iron/nickel markets.',
-        comparable_targets: ['Amun', '1986 DA']
-      },
-      sources: ['NASA JPL SBDB', 'Bus-DeMeo Spectral Taxonomy', 'Asterank Database'],
-      images: {
-        asteroid_render: '',
-        composition_map: '',
-        route_map: '',
-        physical_profile: ''
-      }
-    };
-  };
-
   // Only allow process.env.GEMINI_API_KEY fallback in local dev.
   // On Vercel (production), enforce the user-provided key from the UI.
   const isLocalDev = process.env.NODE_ENV === 'development';
   const apiKey = req.headers.get('x-gemini-api-key') || (isLocalDev ? process.env.GEMINI_API_KEY : null);
   
   if (!apiKey) {
-    console.log('[API] GEMINI_API_KEY not provided — using precompiled/mock report');
-    const mock = generateMockReport(asteroidId);
-    return NextResponse.json({
-      asteroid_id: asteroidId,
-      cached: false,
-      report: mock,
-      timestamp: new Date().toISOString(),
-    });
+    console.error('[API] /asteroid: GEMINI_API_KEY not provided');
+    return NextResponse.json({ error: 'GEMINI_API_KEY not provided' }, { status: 401 });
   }
 
   try {
@@ -208,14 +124,6 @@ export async function GET(
 
   } catch (err) {
     console.error('[API] Gemini Agent 4 execution failed:', err);
-    // Return mock fallback on failure to guarantee perfect application robustness
-    const mock = generateMockReport(asteroidId);
-    return NextResponse.json({
-      asteroid_id: asteroidId,
-      cached: false,
-      report: mock,
-      timestamp: new Date().toISOString(),
-      error: String(err),
-    });
+    return NextResponse.json({ error: String(err) }, { status: 502 });
   }
 }

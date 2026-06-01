@@ -11,48 +11,26 @@ export async function GET(req: Request) {
 
   const pool = getDbPool();
 
-  // Helper to dynamically fluctuate prices slightly to keep the live ticker animated
-  const fluctuatePrices = (prices: any[]) => {
-    return prices.map((p) => {
-      const change = (Math.random() - 0.5) * 0.02; // max +-1% change
-      const newPrice = Math.max(1, p.price_usd * (1 + change));
-      const changePct = Number(((newPrice - p.price_usd) / p.price_usd * 100).toFixed(2));
-      return {
-        ...p,
-        price_usd: Number(newPrice.toFixed(2)),
-        change_pct: changePct,
-        trend: changePct >= 0 ? 'up' : 'down',
-        fetched_at: new Date().toISOString(),
-      };
-    });
-  };
-
-  // If no API key, fallback to local fast simulation (mock data)
   if (!apiKey) {
-    console.log('[API] /prices: No API key provided — falling back to mock prices');
-    memStore.prices = fluctuatePrices(memStore.prices);
-    return NextResponse.json({ prices: memStore.prices, agent_logs: [] });
+    console.error('[API] /prices: GEMINI_API_KEY not provided');
+    return NextResponse.json({ error: 'GEMINI_API_KEY not provided' }, { status: 401 });
   }
 
   try {
     let basePrices = memStore.prices;
     if (pool) {
-      try {
-        const result = await pool.query(`SELECT DISTINCT ON (mineral) * FROM market_prices ORDER BY mineral, fetched_at DESC`);
-        if (result.rows.length > 0) {
-          basePrices = result.rows.map(r => ({
-            mineral: r.mineral, price_usd: Number(r.price_usd), trend: r.trend, urgency: Number(r.urgency), change_pct: Number(r.change_pct), disruption: r.disruption, source_url: r.source_url, category: r.category, criticality: Number(r.criticality)
-          }));
-        }
-      } catch (e) {
-        console.error('[API] DB fetch failed, using memStore', e);
+      const result = await pool.query(`SELECT DISTINCT ON (mineral) * FROM market_prices ORDER BY mineral, fetched_at DESC`);
+      if (result.rows.length > 0) {
+        basePrices = result.rows.map(r => ({
+          mineral: r.mineral, price_usd: Number(r.price_usd), trend: r.trend, urgency: Number(r.urgency), change_pct: Number(r.change_pct), disruption: r.disruption, source_url: r.source_url, category: r.category, criticality: Number(r.criticality)
+        }));
       }
     }
 
     console.log('[API] /prices: Querying Gemini for live market update...');
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-3.5-flash",
+      model: "gemini-2.5-flash",
       generationConfig: { temperature: 0.9 }
     });
 
@@ -111,8 +89,11 @@ Example:
     try {
       data = JSON.parse(responseText);
     } catch (e) {
-      console.warn('[API] /prices: Gemini returned invalid JSON. Falling back to mock fluctuation.', e);
-      return NextResponse.json({ prices: fluctuatePrices(basePrices), agent_logs: ["[AGENT2] ⚠ Feed Error: Retrying connection to market data source..."] });
+      console.error('[API] /prices: Gemini returned invalid JSON.', e);
+      return NextResponse.json(
+        { error: 'Gemini returned invalid JSON', raw: responseText },
+        { status: 502 }
+      );
     }
 
     if (!data.prices || !Array.isArray(data.prices)) {
@@ -124,21 +105,18 @@ Example:
       fetched_at: new Date().toISOString()
     }));
 
-    // Cache to DB asynchronously so we don't block the response
     if (pool) {
-      (async () => {
-        for (const p of newPrices) {
-          try {
-            await pool.query(
-              `INSERT INTO market_prices (mineral, price_usd, trend, urgency, change_pct, disruption, source_url, category, criticality, fetched_at)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
-              [p.mineral, p.price_usd, p.trend, p.urgency, p.change_pct, p.disruption, p.source_url, p.category, p.criticality]
-            );
-          } catch (e) {} // ignore async db insert errors
-        }
-      })();
+      await Promise.all(
+        newPrices.map((p: any) =>
+          pool.query(
+            `INSERT INTO market_prices (mineral, price_usd, trend, urgency, change_pct, disruption, source_url, category, criticality, fetched_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
+            [p.mineral, p.price_usd, p.trend, p.urgency, p.change_pct, p.disruption, p.source_url, p.category, p.criticality]
+          )
+        )
+      );
+      console.log(`[API] /prices: saved ${newPrices.length} market_prices rows to Neon`);
     } else {
-      // Fallback: save to memory store so the next AI poll continues evolving from this state!
       memStore.prices = newPrices;
     }
 
@@ -149,7 +127,6 @@ Example:
 
   } catch (err) {
     console.error('[API] GET /prices error:', err);
-    memStore.prices = fluctuatePrices(memStore.prices);
-    return NextResponse.json({ prices: memStore.prices, agent_logs: ["[AGENT2] ⚠ Connection timeout. Falling back to cached local market data."] });
+    return NextResponse.json({ error: String(err) }, { status: 502 });
   }
 }

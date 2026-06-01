@@ -185,7 +185,7 @@ export async function GET(req: Request) {
       console.log('[API] /rankings: Querying Gemini for strategic ranking logs...');
       const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({ 
-        model: "gemini-3.5-flash",
+        model: "gemini-2.5-flash",
         generationConfig: { temperature: 0.8 }
       });
 
@@ -224,16 +224,12 @@ Example:
       const parsed = JSON.parse(result.response.text());
       agent_logs = parsed.agent_logs || [];
     } catch (e) {
-      console.warn('[API] /rankings: Gemini failed to generate logs. Falling back.', e);
-      agent_logs = ["[AGENT3] ⚠ AI offline. Strategic ranker updated deterministically."];
+      console.error('[API] /rankings: Gemini failed to generate ranking logs.', e);
+      return NextResponse.json({ error: String(e) }, { status: 502 });
     }
   } else {
-    // Demo mode logs
-    agent_logs = [
-      "[AGENT3] No API Key — Running offline deterministic scoring...",
-      `[AGENT3] \${rankings[0].name} ranked #1 (Score: \${rankings[0].research_summary.split(' ')[1]})`,
-      "[AGENT3] Ranking matrices broadcasted successfully."
-    ];
+    console.error('[API] /rankings: GEMINI_API_KEY not provided');
+    return NextResponse.json({ error: 'GEMINI_API_KEY not provided' }, { status: 401 });
   }
 
   const responsePayload = {
@@ -244,12 +240,11 @@ Example:
   };
 
   if (pool) {
-    try {
-      await pool.query(
-        `INSERT INTO strategic_rankings (rankings, routes, urgency_map) VALUES ($1, $2, $3)`,
-        [JSON.stringify(rankings), JSON.stringify(routes), JSON.stringify(urgencyMap)]
-      );
-    } catch (err) {}
+    await pool.query(
+      `INSERT INTO strategic_rankings (rankings, routes, urgency_map) VALUES ($1, $2, $3)`,
+      [JSON.stringify(rankings), JSON.stringify(routes), JSON.stringify(urgencyMap)]
+    );
+    console.log(`[API] /rankings: saved ${rankings.length} rankings and ${routes.length} routes to Neon`);
   }
 
   return NextResponse.json(responsePayload);

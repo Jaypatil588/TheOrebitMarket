@@ -46,6 +46,9 @@ import {
 } from "@/lib/missionAgentLog";
 
 const AGENT_FEED_LOG_CAP = 120;
+const LIVE_PRICE_POLL_MS = 8000; // 7.5 RPM
+const LIVE_RANKING_POLL_MS = 10000; // 6 RPM
+const LIVE_VALUATION_POLL_MS = 120000; // 0.5 RPM, DB-backed Agent 1 heartbeat
 
 export function useOrebitWebSocket(url?: string) {
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -87,13 +90,14 @@ export function useOrebitWebSocket(url?: string) {
   );
 
   /** Load cached NeonDB data via REST — safe to call on mount and after WS reconnect. */
-  const loadBootstrap = useCallback(async () => {
+  const loadBootstrap = useCallback(async (apiKey?: string | null) => {
+    const headers = apiKey ? { 'x-gemini-api-key': apiKey } : undefined;
     const [pricesResult, rankingsResult] = await Promise.allSettled([
-      fetch(`${BACKEND_URL}/api/prices`).then(async (res) => {
+      fetch(`${BACKEND_URL}/api/prices`, { headers }).then(async (res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
       }),
-      fetch(`${BACKEND_URL}/api/rankings`).then(async (res) => {
+      fetch(`${BACKEND_URL}/api/rankings`, { headers }).then(async (res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
       }),
@@ -129,7 +133,11 @@ export function useOrebitWebSocket(url?: string) {
 
     const run = async () => {
       if (cancelled) return;
-      const result = await loadBootstrap();
+      const savedKey =
+        typeof window !== "undefined" ? localStorage.getItem("orebit_gemini_api_key") : null;
+      if (!savedKey) return;
+
+      const result = await loadBootstrap(savedKey);
       if (cancelled) return;
       if (result.gotPrices && result.gotRankings) return;
 
@@ -616,6 +624,9 @@ export function useOrebitWebSocket(url?: string) {
         console.log("[DATA] 📡 Fetching live prices from Gemini AI...");
         const res = await fetch(`${BACKEND_URL}/api/prices`, { headers: { 'x-gemini-api-key': key } });
         const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data?.error || `HTTP ${res.status}`);
+        }
         console.log("[MARKET] 📊 Received Market Prices:", data.prices);
         if (data.agent_logs) console.log("[AGENT] 🤖 Market Agent Logs:", data.agent_logs);
         if (data.prices) setMarketPrices(data.prices);
@@ -630,6 +641,9 @@ export function useOrebitWebSocket(url?: string) {
         console.log("[DATA] 📡 Fetching live strategic rankings from Gemini AI...");
         const res = await fetch(`${BACKEND_URL}/api/rankings`, { headers: { 'x-gemini-api-key': key } });
         const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data?.error || `HTTP ${res.status}`);
+        }
         console.log("[DATA] 🏆 Received Asteroid Rankings:", data.rankings);
         console.log("[DATA] 🚀 Received Mission Routes:", data.routes);
         if (data.agent_logs) console.log("[AGENT] 🤖 Ranking Agent Logs:", data.agent_logs);
@@ -641,19 +655,43 @@ export function useOrebitWebSocket(url?: string) {
       }
     };
 
+    const fetchValuationHeartbeat = async () => {
+      try {
+        console.log("[DATA] Fetching Agent 1 valuation cache heartbeat...");
+        const res = await fetch(`${BACKEND_URL}/api/asteroids`);
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data?.error || `HTTP ${res.status}`);
+        }
+        const asteroidCount = Array.isArray(data.asteroids) ? data.asteroids.length : 0;
+        appendValuationFeedLogs([
+          `[AGENT1] Valuation cache heartbeat | ${asteroidCount} asteroid valuations loaded from Neon`,
+          "[AGENT1] Standing by for market-triggered repricing signals",
+        ]);
+      } catch (e) {
+        console.error("[ERROR] Agent 1 valuation heartbeat failed", e);
+        appendValuationFeedLogs([`[AGENT1] ERROR ${String(e)}`]);
+      }
+    };
+
     const startLivePolling = (key: string) => {
       setConnected(true);
       console.log("[Feed] Live Vercel polling architecture initialized.");
       appendMarketFeedLogs(["[SYSTEM] Live polling architecture engaged.", "[SYSTEM] Polling Gemini for market conditions..."]);
       appendRankerFeedLogs(["[SYSTEM] Live ranking evaluation engaged.", "[SYSTEM] Standing by for market signals..."]);
+      appendValuationFeedLogs(["[SYSTEM] Agent 1 valuation heartbeat engaged.", "[SYSTEM] Reading persisted asteroid valuation cache..."]);
+      appendMissionFeedLogs(["[SYSTEM] Agent 4 mission architect online.", "[SYSTEM] Awaiting asteroid selection for deep-dive generation..."]);
       
       // Initial fetch
       fetchLivePrices(key);
       fetchLiveRankings(key);
+      fetchValuationHeartbeat();
 
-      // Poll every 15s for prices (4 RPM), 20s for rankings (3 RPM) - Tight 7 RPM baseline
-      pollingTimers.push(setInterval(() => fetchLivePrices(key), 15000));
-      pollingTimers.push(setInterval(() => fetchLiveRankings(key), 20000));
+      // Gemini loop: 7.5 RPM prices + 6 RPM rankings = 13.5 RPM.
+      // Agent 1 heartbeat is DB-backed and keeps the full agent feed alive without consuming Gemini quota.
+      pollingTimers.push(setInterval(() => fetchLivePrices(key), LIVE_PRICE_POLL_MS));
+      pollingTimers.push(setInterval(() => fetchLiveRankings(key), LIVE_RANKING_POLL_MS));
+      pollingTimers.push(setInterval(fetchValuationHeartbeat, LIVE_VALUATION_POLL_MS));
     };
 
     const doConnect = (key?: string | null) => {
@@ -670,10 +708,10 @@ export function useOrebitWebSocket(url?: string) {
 
       if (!savedKey) {
         console.log("[Feed] No API key provided — initializing demo mode");
-        loadBootstrap().then(() => doConnect(null)).catch(() => doConnect(null));
+        doConnect(null);
       } else {
         console.log("[Feed] API key detected — initializing live polling environment");
-        loadBootstrap().then(() => doConnect(savedKey)).catch(() => doConnect(savedKey));
+        loadBootstrap(savedKey).then(() => doConnect(savedKey)).catch(() => doConnect(savedKey));
       }
     };
 
