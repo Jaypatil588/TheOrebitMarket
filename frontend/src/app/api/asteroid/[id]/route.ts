@@ -171,7 +171,7 @@ export async function GET(
     `;
 
     const model = ai.getGenerativeModel({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.5-flash',
       systemInstruction,
     });
 

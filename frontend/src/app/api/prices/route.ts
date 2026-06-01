@@ -51,7 +51,7 @@ export async function GET(req: Request) {
 
     console.log('[API] /prices: Querying Gemini for live market update...');
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
 
     const systemInstruction = `
 You are the "Market Intelligence Agent" (Agent 2) for The Orebit Market, an advanced deep-space asteroid mining commodity exchange.

@@ -180,7 +180,7 @@ export async function GET(req: Request) {
     try {
       console.log('[API] /rankings: Querying Gemini for strategic ranking logs...');
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+      const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
 
       const top3 = rankings.slice(0, 3).map((r: any) => ({ name: r.name, rank: r.rank, top_mineral: r.valuation.top_mineral, score: r.score }));
 
