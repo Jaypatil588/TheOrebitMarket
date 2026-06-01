@@ -609,11 +609,52 @@ export function useOrebitWebSocket(url?: string) {
       }, 800); // Faster ticks for more dynamic feel
     };
 
-    // Serverless mode: Boot simulation immediately as there is no long-running WebSocket server on Vercel.
-    const doConnect = () => {
-      // In a pure Vercel Serverless environment, we rely on the client-side simulation 
-      // for the visual log feed, and we use REST API edge functions for heavy Gemini workloads.
-      startSimulation();
+    let pollingTimers: NodeJS.Timeout[] = [];
+
+    const fetchLivePrices = async (key: string) => {
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/prices`, { headers: { 'x-gemini-api-key': key } });
+        const data = await res.json();
+        if (data.prices) setMarketPrices(data.prices);
+        if (data.agent_logs && data.agent_logs.length > 0) appendMarketFeedLogs(data.agent_logs);
+      } catch (e) {
+        console.error("Live price fetch failed", e);
+      }
+    };
+
+    const fetchLiveRankings = async (key: string) => {
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/rankings`, { headers: { 'x-gemini-api-key': key } });
+        const data = await res.json();
+        if (data.rankings) setRankings(data.rankings);
+        if (data.routes) setRoutes(data.routes);
+        if (data.agent_logs && data.agent_logs.length > 0) appendRankerFeedLogs(data.agent_logs);
+      } catch (e) {
+        console.error("Live rankings fetch failed", e);
+      }
+    };
+
+    const startLivePolling = (key: string) => {
+      setConnected(true);
+      console.log("[Feed] Live Vercel polling architecture initialized.");
+      appendMarketFeedLogs(["[SYSTEM] Live polling architecture engaged.", "[SYSTEM] Polling Gemini for market conditions..."]);
+      appendRankerFeedLogs(["[SYSTEM] Live ranking evaluation engaged.", "[SYSTEM] Standing by for market signals..."]);
+      
+      // Initial fetch
+      fetchLivePrices(key);
+      fetchLiveRankings(key);
+
+      // Poll every 15s for prices, 30s for rankings
+      pollingTimers.push(setInterval(() => fetchLivePrices(key), 15000));
+      pollingTimers.push(setInterval(() => fetchLiveRankings(key), 30000));
+    };
+
+    const doConnect = (key?: string | null) => {
+      if (key) {
+        startLivePolling(key);
+      } else {
+        startSimulation();
+      }
     };
 
     const connect = () => {
@@ -622,10 +663,10 @@ export function useOrebitWebSocket(url?: string) {
 
       if (!savedKey) {
         console.log("[Feed] No API key provided — initializing demo mode");
-        loadBootstrap().then(() => doConnect()).catch(() => doConnect());
+        loadBootstrap().then(() => doConnect(null)).catch(() => doConnect(null));
       } else {
-        console.log("[Feed] API key detected — initializing live Vercel environment");
-        loadBootstrap().then(() => doConnect()).catch(() => doConnect());
+        console.log("[Feed] API key detected — initializing live polling environment");
+        loadBootstrap().then(() => doConnect(savedKey)).catch(() => doConnect(savedKey));
       }
     };
 
@@ -634,6 +675,7 @@ export function useOrebitWebSocket(url?: string) {
     return () => {
       cancelled = true;
       if (simulationTimer) clearInterval(simulationTimer);
+      pollingTimers.forEach(t => clearInterval(t));
     };
   }, [url, handleWsPayload, loadBootstrap, appendMarketFeedLogs, appendRankerFeedLogs, appendValuationFeedLogs, appendMissionFeedLogs, addLog]);
 
