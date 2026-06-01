@@ -244,13 +244,17 @@ export function AsteroidDetail({
       headers["x-gemini-api-key"] = geminiKey;
     }
 
+    console.log(`[DATA] 📡 Fetching Asteroid Profile from Gemini AI:`, detailUrl);
+
     fetch(detailUrl, { headers })
       .then((r) => {
         if (!r.ok) throw new Error();
         return r.json();
       })
-      .then((d: EnrichedPayload) => {
-        setApi(d);
+      .then((data: EnrichedPayload) => {
+        console.log(`[DATA] 🪨 Received Asteroid Data for ${selectedAsteroid.id}:`, data);
+        if ((data as any).agent_logs) console.log(`[AGENT] 🤖 Architect Logs for ${selectedAsteroid.id}:`, (data as any).agent_logs);
+        setApi(data);
         setLoading(false);
       })
       .catch(() => {

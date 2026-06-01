@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getDbPool } from '@/lib/db';
+import { getDbPool, memStore } from '@/lib/db';
 import fs from 'fs';
 import path from 'path';
 
@@ -26,17 +26,11 @@ export async function GET(req: Request) {
   const pool = getDbPool();
 
   // 1. Fetch Latest Prices and Scenarios
-  let prices = [
-    { mineral: 'cobalt', priceUSD: 33800.0, urgency: 0.82 },
-    { mineral: 'platinum', priceUSD: 31240.0, urgency: 0.78 },
-    { mineral: 'palladium', priceUSD: 42180.0, urgency: 0.74 },
-    { mineral: 'neodymium', priceUSD: 210.0, urgency: 0.72 },
-    { mineral: 'dysprosium', priceUSD: 480.0, urgency: 0.68 },
-    { mineral: 'rhodium', priceUSD: 145200.0, urgency: 0.68 },
-    { mineral: 'nickel', priceUSD: 16400.0, urgency: 0.55 },
-    { mineral: 'rare_earths', priceUSD: 85000.0, urgency: 0.72 },
-    { mineral: 'water_ice', priceUSD: 500.0, urgency: 0.40 }
-  ];
+  let prices = memStore.prices.map(p => ({
+    mineral: p.mineral,
+    priceUSD: p.price_usd,
+    urgency: p.urgency
+  }));
   let scenarios: any[] = [];
 
   if (pool) {
@@ -154,26 +148,27 @@ export async function GET(req: Request) {
     },
     orbital: s.orbital,
     risk: { composition_confidence: 0.75, data_completeness: 0.8 },
-    research_summary: `Scored \${s.score} based on high market urgency for \${s.topMineral} and optimal orbital delta-v of \${s.deltaV} km/s.`,
+    research_summary: `Scored ${s.score} based on high market urgency for ${s.topMineral} and optimal orbital delta-v of ${s.deltaV} km/s.`,
     scenario_impact: 0.0,
   }));
 
   const generateRouteStops = (focusMineral: string, color: string, label: string) => {
     const candidates = scored.filter((s: any) => s.topMineral === focusMineral || s.composition[focusMineral] > 5).slice(0, 3);
-    const stops = [{ order: 0, body: 'Earth', departure: '2028-04-12', delta_v_to_next: 3.2 }];
+    const stops = [{ order: 0, body: 'Earth', departure: '2028-04-12', delta_v_to_next_km_s: 3.2 }];
     let order = 1;
     let totalVal = 0;
     for (const c of candidates) {
-      stops.push({ order, asteroid_id: c.id, name: c.name, mineral_target: focusMineral, extractable_value: c.estValue * 0.15, stay_duration_days: 120, delta_v_to_next: 1.8 } as any);
+      stops.push({ order, asteroid_id: c.id, name: c.name, mineral_target: focusMineral, extractable_value_usd: c.estValue * 0.15, stay_duration_days: 120, delta_v_to_next_km_s: 1.8 } as any);
       totalVal += c.estValue * 0.15;
       order++;
     }
     stops.push({ order, body: 'Earth', arrival: '2032-11-20' } as any);
     const totalCost = 1.8e9 + candidates.length * 4e8;
     return {
-      id: `\${focusMineral}_priority`, label, color, urgency_score: urgencyMap[focusMineral] || 0.5, urgency_reason: `High demand for \${focusMineral} detected in market feeds.`, mineral_focus: [focusMineral], stops,
-      totals: { value: totalVal, cost: totalCost, net: totalVal - totalCost, duration_years: 4.6, roi_percent: Number(((totalVal - totalCost) / totalCost * 100).toFixed(1)), total_delta_v: 7.2 + candidates.length * 1.5, minerals_covered: [focusMineral, 'iron', 'nickel'] },
-      reasoning: `Highly optimized route targetting \${focusMineral} scarcity in current industrial cycles.`
+      id: `${focusMineral}_priority`, label, color_hex: color, urgency_score: urgencyMap[focusMineral] || 0.5, urgency_reason: `High demand for ${focusMineral} detected in market feeds.`, mineral_focus: [focusMineral], stops,
+      is_default: false, scenario_driven: false,
+      totals: { total_value_usd: totalVal, total_cost_usd: totalCost, net_return_usd: totalVal - totalCost, duration_years: 4.6, roi_pct: Number(((totalVal - totalCost) / totalCost * 100).toFixed(1)), total_delta_v_km_s: 7.2 + candidates.length * 1.5, minerals_covered: [focusMineral, 'iron', 'nickel'] },
+      route_reasoning: `Highly optimized route targetting ${focusMineral} scarcity in current industrial cycles.`
     };
   };
 
@@ -189,16 +184,21 @@ export async function GET(req: Request) {
     try {
       console.log('[API] /rankings: Querying Gemini for strategic ranking logs...');
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
+      const model = genAI.getGenerativeModel({ 
+        model: "gemini-3.5-flash",
+        generationConfig: { temperature: 0.8 }
+      });
 
       const top3 = rankings.slice(0, 3).map((r: any) => ({ name: r.name, rank: r.rank, top_mineral: r.valuation.top_mineral, score: r.score }));
 
       const systemInstruction = `
-You are the "Strategic Ranker Agent" (Agent 3) for The Orebit Market.
-Your job is to generate internal agent reasoning logs that explain why the top 3 asteroids were just ranked the highest.
+You are the "Strategic Ranker AI" (Agent 3) for The Orebit Market. 
+Your job is to write a brief, hyper-technical, cyberpunk-style stream-of-consciousness thought log about why you just adjusted the rankings.
 
-Current top 3 targets:
-\${JSON.stringify(top3)}
+Current Time/Seed: ${new Date().toISOString()} (Ensure your thoughts are fresh and unique based on this timeline).
+
+The top 3 asteroids you just mathematically selected are:
+${JSON.stringify(top3)}
 
 Output a strict JSON object:
 {

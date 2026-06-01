@@ -51,11 +51,16 @@ export async function GET(req: Request) {
 
     console.log('[API] /prices: Querying Gemini for live market update...');
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-3.5-flash",
+      generationConfig: { temperature: 0.9 }
+    });
 
     const systemInstruction = `
 You are the "Market Intelligence Agent" (Agent 2) for The Orebit Market, an advanced deep-space asteroid mining commodity exchange.
 Your job is to generate a realistic market update for 12 critical space-mined commodities based on simulated real-world supply chain constraints, defense stockpiles, and geopolitical events.
+
+Current Time/Seed: ${new Date().toISOString()} (Use this to ensure your news and reasoning are entirely unique from previous updates).
 
 Current base prices for reference:
 ${JSON.stringify(basePrices.map(p => ({ mineral: p.mineral, price: p.price_usd, urgency: p.urgency })))}
@@ -132,6 +137,9 @@ Example:
           } catch (e) {} // ignore async db insert errors
         }
       })();
+    } else {
+      // Fallback: save to memory store so the next AI poll continues evolving from this state!
+      memStore.prices = newPrices;
     }
 
     return NextResponse.json({

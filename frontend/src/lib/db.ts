@@ -5,7 +5,7 @@ let pool: Pool | null = null;
 export function getDbPool(): Pool | null {
   if (pool) return pool;
 
-  const connectionString = process.env.DATABASE_URL;
+  const connectionString = "postgresql://neondb_owner:npg_uCI7R3UeYXDE@ep-empty-bird-aku4pj83-pooler.c-3.us-west-2.aws.neon.tech/neondb?channel_binding=require&sslmode=require";
   if (!connectionString) {
     console.log('[DB] DATABASE_URL not set — using in-memory/JSON store fallback');
     return null;

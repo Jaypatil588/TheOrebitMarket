@@ -613,24 +613,31 @@ export function useOrebitWebSocket(url?: string) {
 
     const fetchLivePrices = async (key: string) => {
       try {
+        console.log("[DATA] 📡 Fetching live prices from Gemini AI...");
         const res = await fetch(`${BACKEND_URL}/api/prices`, { headers: { 'x-gemini-api-key': key } });
         const data = await res.json();
+        console.log("[MARKET] 📊 Received Market Prices:", data.prices);
+        if (data.agent_logs) console.log("[AGENT] 🤖 Market Agent Logs:", data.agent_logs);
         if (data.prices) setMarketPrices(data.prices);
         if (data.agent_logs && data.agent_logs.length > 0) appendMarketFeedLogs(data.agent_logs);
       } catch (e) {
-        console.error("Live price fetch failed", e);
+        console.error("[ERROR] ❌ Live price fetch failed", e);
       }
     };
 
     const fetchLiveRankings = async (key: string) => {
       try {
+        console.log("[DATA] 📡 Fetching live strategic rankings from Gemini AI...");
         const res = await fetch(`${BACKEND_URL}/api/rankings`, { headers: { 'x-gemini-api-key': key } });
         const data = await res.json();
+        console.log("[DATA] 🏆 Received Asteroid Rankings:", data.rankings);
+        console.log("[DATA] 🚀 Received Mission Routes:", data.routes);
+        if (data.agent_logs) console.log("[AGENT] 🤖 Ranking Agent Logs:", data.agent_logs);
         if (data.rankings) setRankings(data.rankings);
         if (data.routes) setRoutes(data.routes);
         if (data.agent_logs && data.agent_logs.length > 0) appendRankerFeedLogs(data.agent_logs);
       } catch (e) {
-        console.error("Live rankings fetch failed", e);
+        console.error("[ERROR] ❌ Live rankings fetch failed", e);
       }
     };
 
@@ -644,9 +651,9 @@ export function useOrebitWebSocket(url?: string) {
       fetchLivePrices(key);
       fetchLiveRankings(key);
 
-      // Poll every 15s for prices, 30s for rankings
+      // Poll every 15s for prices (4 RPM), 20s for rankings (3 RPM) - Tight 7 RPM baseline
       pollingTimers.push(setInterval(() => fetchLivePrices(key), 15000));
-      pollingTimers.push(setInterval(() => fetchLiveRankings(key), 30000));
+      pollingTimers.push(setInterval(() => fetchLiveRankings(key), 20000));
     };
 
     const doConnect = (key?: string | null) => {
