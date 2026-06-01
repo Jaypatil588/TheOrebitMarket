@@ -295,7 +295,8 @@ export async function GET(
 
     const response = await model.generateContent(prompt);
     const rawText = response.response.text() || '{}';
-    const reportData = JSON.parse(rawText.trim());
+    const jsonString = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const reportData = JSON.parse(jsonString);
 
     // Cache the report to Neon DB if connected
     if (pool) {
